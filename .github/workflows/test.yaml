@@ -1,0 +1,90 @@
+name: Test
+
+on:
+  workflow_call:
+
+jobs:
+  linux:
+    name: ${{ matrix.config.name }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: linux_gcc_9
+            compiler: gcc
+            compiler_version: 9
+          - name: linux_gcc_12
+            compiler: gcc
+            compiler_version: 12
+          - name: linux_clang_12
+            compiler: clang
+            compiler_version: 12
+          - name: linux_clang_15
+            compiler: clang
+            compiler_version: 15
+    container:
+      image: quay.io/richiesams/docker_${{ matrix.config.compiler }}:${{ matrix.config.compiler_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and Test Debug
+        run: make CMAKE_PRESET=Unix_x64_Debug generate build test
+      - name: Build and Test Release
+        run: make CMAKE_PRESET=Unix_x64_Release generate build test
+  darwin:
+    name: ${{ matrix.config.name }}
+    runs-on: macOS-13
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: darwin_gcc_9
+            brew_package: gcc@9
+            cc: /usr/local/opt/gcc@9/bin/gcc-9
+            cxx: /usr/local/opt/gcc@9/bin/g++-9
+          - name: darwin_gcc_12
+            brew_package: gcc@12
+            cc: /usr/local/opt/gcc@12/bin/gcc-12
+            cxx: /usr/local/opt/gcc@12/bin/g++-12
+          - name: darwin_clang_12
+            brew_package: llvm@12
+            cc: /usr/local/opt/llvm@12/bin/clang
+            cxx: /usr/local/opt/llvm@12/bin/clang++
+          - name: darwin_clang_15
+            brew_package: llvm@15
+            cc: /usr/local/opt/llvm@15/bin/clang
+            cxx: /usr/local/opt/llvm@15/bin/clang++
+    env:
+      CC: ${{ matrix.config.cc }}
+      CXX: ${{ matrix.config.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install
+        run: brew install ${{ matrix.config.brew_package }}
+      - name: Build and Test Debug
+        run: make CMAKE_PRESET=Unix_x64_Debug generate build test
+      - name: Build and Test Release
+        run: make CMAKE_PRESET=Unix_x64_Release generate build test
+  windows:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: windows_vs_2019
+            os: windows-2019
+            compiler_version: 2019
+          - name: windows_vs_2022
+            os: windows-2022
+            compiler_version: 2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion: "${{ matrix.compiler_version }}"
+      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Build and Test Debug
+        run: make CMAKE_PRESET=Win_x64_Debug generate build test
+      - name: Build and Test Release
+        run: make CMAKE_PRESET=Win_x64_Release generate build test
