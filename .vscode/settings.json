@@ -1,4 +1,15 @@
 {
+    "testMate.cpp.test.advancedExecutables": [
+        {
+            "pattern": "{build,Build,BUILD,out,Out,OUT}/**/*{test,Test,TEST}*",
+            "cwd": "${absDirpath}",
+            "runTask": {
+                "before": [
+                    "build"
+                ]
+            }
+        }
+    ],
     "files.associations": {
         "bitset": "cpp",
         "string": "cpp",
