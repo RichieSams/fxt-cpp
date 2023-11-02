@@ -14,10 +14,10 @@
 TEST_CASE("TestGeneralWrite", "[write]") {
 	std::vector<uint8_t> buffer;
 
-	fxt::Writer writer((void *)&buffer, [](void *userContext, uint8_t *data, size_t len) -> int {
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
 		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
 
-		buffer->insert(buffer->end(), data, data + len);
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
 		return 0;
 	});
 
@@ -148,7 +148,4 @@ TEST_CASE("TestGeneralWrite", "[write]") {
 		REQUIRE(writer.AddContextSwitchRecord(3, 1, 87, 45, 255, &incomingWeight, &outgoingWeight) == 0);
 	}
 	REQUIRE(writer.AddThreadWakeupRecord(3, 45, 925) == 0);
-
-	// Flush
-	REQUIRE(writer.Flush() == 0);
 }
