@@ -151,12 +151,4 @@ TEST_CASE("TestGeneralWrite", "[write]") {
 
 	// Flush
 	REQUIRE(writer.Flush() == 0);
-
-	// Test the output
-	FILE *file = fopen("test.fxt", "wb");
-	REQUIRE(file != nullptr);
-
-	fwrite(&buffer[0], 1, buffer.size(), file);
-
-	fclose(file);
 }
