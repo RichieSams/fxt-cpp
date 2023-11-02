@@ -18,10 +18,19 @@
 
 namespace fxt {
 
-typedef int (*WriteFunc)(void *userContext, uint8_t *data, size_t len);
+typedef int (*WriteFunc)(void *userContext, const void *data, size_t len);
 
 class Writer {
 public:
+	/**
+	 * @brief Construct a new Writer
+	 *
+	 * @note Write does *not* do any buffering of data. It will directly call writeFunc() for each
+	 *       write. It's up to the user to do buffering if they require it
+	 *
+	 * @param userContext    A pointer that will be passed to writeFunc when called
+	 * @param writeFunc      This function will be called whenever data needs to be written to the stream
+	 */
 	Writer(void *userContext, WriteFunc writeFunc);
 	~Writer();
 
@@ -33,19 +42,8 @@ private:
 
 	void *m_userContext;
 	WriteFunc m_writeFunc;
-	uint8_t m_writeBuffer[2048];
-	size_t m_writeBufferOffset = 0;
 
 public:
-	/**
-	 * @brief Flushes any unwritten data to the stream
-	 *
-	 * @return     0 on success. Non-zero for failure
-	 */
-	int Flush() {
-		return FlushStreamBuffer();
-	}
-
 	/**
 	 * @brief Adds a Magic Number record to the stream
 	 *
@@ -401,7 +399,6 @@ private:
 	int WriteUInt64ToStream(uint64_t val);
 	int WriteBytesToStream(const void *val, size_t len);
 	int WriteZeroPadding(size_t count);
-	int FlushStreamBuffer();
 
 	int AddStringRecord(uint16_t stringIndex, const char *str, size_t strLen);
 	int AddThreadRecord(uint16_t threadIndex, KernelObjectID processID, KernelObjectID threadID);

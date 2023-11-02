@@ -215,69 +215,34 @@ int Writer::AddBlobRecord(const char *name, void *data, size_t dataLen, BlobType
 }
 
 int Writer::WriteUInt64ToStream(uint64_t val) {
-	if (m_writeBufferOffset + sizeof(val) >= sizeof(m_writeBuffer)) {
-		const int ret = FlushStreamBuffer();
-		if (ret != 0) {
-			return ret;
-		}
-	}
+	uint8_t buffer[8];
 
-	m_writeBuffer[m_writeBufferOffset + 0] = uint8_t(val);
-	m_writeBuffer[m_writeBufferOffset + 1] = uint8_t(val >> 8);
-	m_writeBuffer[m_writeBufferOffset + 2] = uint8_t(val >> 16);
-	m_writeBuffer[m_writeBufferOffset + 3] = uint8_t(val >> 24);
-	m_writeBuffer[m_writeBufferOffset + 4] = uint8_t(val >> 32);
-	m_writeBuffer[m_writeBufferOffset + 5] = uint8_t(val >> 40);
-	m_writeBuffer[m_writeBufferOffset + 6] = uint8_t(val >> 48);
-	m_writeBuffer[m_writeBufferOffset + 7] = uint8_t(val >> 56);
+	buffer[0] = uint8_t(val);
+	buffer[1] = uint8_t(val >> 8);
+	buffer[2] = uint8_t(val >> 16);
+	buffer[3] = uint8_t(val >> 24);
+	buffer[4] = uint8_t(val >> 32);
+	buffer[5] = uint8_t(val >> 40);
+	buffer[6] = uint8_t(val >> 48);
+	buffer[7] = uint8_t(val >> 56);
 
-	m_writeBufferOffset += sizeof(val);
-
-	return 0;
+	return m_writeFunc(m_userContext, buffer, sizeof(buffer));
 }
 
 int Writer::WriteBytesToStream(const void *val, size_t len) {
-	size_t bytesWritten = 0;
-	while (bytesWritten != len) {
-		if (m_writeBufferOffset >= sizeof(m_writeBuffer)) {
-			int ret = FlushStreamBuffer();
-			if (ret != 0) {
-				return ret;
-			}
-		}
-
-		// The writer buffer might not have enough room for all of our bytes
-		// So we limit our write to the size remaining
-		const size_t partialLen = std::min(len - bytesWritten, sizeof(m_writeBuffer) - m_writeBufferOffset);
-		memcpy(&m_writeBuffer[m_writeBufferOffset], (uint8_t *)val + bytesWritten, partialLen);
-
-		bytesWritten += partialLen;
-		m_writeBufferOffset += partialLen;
-	}
-
-	return 0;
+	return m_writeFunc(m_userContext, (uint8_t *)val, len);
 }
 
 int Writer::WriteZeroPadding(size_t count) {
-	if (m_writeBufferOffset + count >= sizeof(m_writeBuffer)) {
-		int ret = FlushStreamBuffer();
+	uint8_t zero = 0;
+
+	for (size_t i = 0; i < count; ++i) {
+		int ret = m_writeFunc(m_userContext, &zero, 1);
 		if (ret != 0) {
 			return ret;
 		}
 	}
 
-	memset(&m_writeBuffer[m_writeBufferOffset], 0, count);
-	m_writeBufferOffset += count;
-	return 0;
-}
-
-int Writer::FlushStreamBuffer() {
-	int ret = m_writeFunc(m_userContext, m_writeBuffer, m_writeBufferOffset);
-	if (ret != 0) {
-		return ret;
-	}
-
-	m_writeBufferOffset = 0;
 	return 0;
 }
 
