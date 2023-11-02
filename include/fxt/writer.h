@@ -546,8 +546,8 @@ private:
 
 private:
 	// Friends
-	// We declare these as friends so we don't expose all the internal helper functions to the public
 
+	// We declare these as friends so we don't expose all the internal helper functions to the public
 	friend class NullEventArgument;
 	friend class Int32EventArgument;
 	friend class UInt32EventArgument;
@@ -558,6 +558,9 @@ private:
 	friend class PointerEventArgument;
 	friend class KOIDEventArgument;
 	friend class BoolEventArgument;
+
+	// So we can test private methods with unit testing
+	friend class WriterTest;
 };
 
 } // End of namespace fxt

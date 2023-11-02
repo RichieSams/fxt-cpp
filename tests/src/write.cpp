@@ -6,6 +6,8 @@
 
 #include "fxt/writer.h"
 
+#include "writer_test.h"
+
 #include "catch2/catch_test_macros.hpp"
 
 #include <stdio.h>
@@ -148,4 +150,117 @@ TEST_CASE("TestGeneralWrite", "[write]") {
 		REQUIRE(writer.AddContextSwitchRecord(3, 1, 87, 45, 255, &incomingWeight, &outgoingWeight) == 0);
 	}
 	REQUIRE(writer.AddThreadWakeupRecord(3, 45, 925) == 0);
+}
+
+TEST_CASE("TestUsingSameStringReturnsSameIndex", "[write]") {
+	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
+		// Just drop the data
+		// We don't need it for this test
+		return 0;
+	});
+
+	// Create a WriterTest instance, so we can access the private methods of Writer
+	fxt::WriterTest writerTest(&writer);
+
+	// Get the string index
+	uint16_t strIndex;
+	REQUIRE(writerTest.GetOrCreateStringIndex("foo", &strIndex) == 0);
+
+	// Do it again with the same string
+	// It should return the same index
+	uint16_t newIndex;
+	REQUIRE(writerTest.GetOrCreateStringIndex("foo", &newIndex) == 0);
+
+	REQUIRE(newIndex == strIndex);
+
+	// If we do it a third time with a new string, it should return a different index
+	uint16_t thirdIndex;
+	REQUIRE(writerTest.GetOrCreateStringIndex("bar", &thirdIndex) == 0);
+	REQUIRE(thirdIndex != strIndex);
+}
+
+TEST_CASE("TestUsingSameThreadReturnsSameIndex", "[write]") {
+	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
+		// Just drop the data
+		// We don't need it for this test
+		return 0;
+	});
+
+	// Create a WriterTest instance, so we can access the private methods of Writer
+	fxt::WriterTest writerTest(&writer);
+
+	// Get the thread index
+	uint16_t threadIndex;
+	REQUIRE(writerTest.GetOrCreateThreadIndex(1, 2, &threadIndex) == 0);
+
+	// Do it again with the same thread
+	// It should return the same index
+	uint16_t newIndex;
+	REQUIRE(writerTest.GetOrCreateThreadIndex(1, 2, &newIndex) == 0);
+
+	REQUIRE(newIndex == threadIndex);
+
+	// If we do it a third time with a new string, it should return a different index
+	uint16_t thirdIndex;
+	REQUIRE(writerTest.GetOrCreateThreadIndex(1, 3, &thirdIndex) == 0);
+	REQUIRE(thirdIndex != threadIndex);
+
+	// Using the same thread ID, but a different process ID is still a different thread
+	uint16_t fourthIndex;
+	REQUIRE(writerTest.GetOrCreateThreadIndex(2, 2, &fourthIndex) == 0);
+	REQUIRE(fourthIndex != threadIndex);
+	REQUIRE(fourthIndex != thirdIndex);
+}
+
+TEST_CASE("TestOverflowingStringTableWraps", "[write]") {
+	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
+		// Just drop the data
+		// We don't need it for this test
+		return 0;
+	});
+
+	// Create a WriterTest instance, so we can access the private methods of Writer
+	fxt::WriterTest writerTest(&writer);
+
+	char buffer[128];
+	uint16_t strIndex;
+	for (int i = 0; i < 512; ++i) {
+		// Generate a unique string for each round. So we get a new index
+		REQUIRE(snprintf(buffer, sizeof(buffer), "str-%d", i) < sizeof(buffer));
+		REQUIRE(writerTest.GetOrCreateStringIndex(buffer, &strIndex) == 0);
+		// Zero is a reserved index
+		// We should never get it
+		REQUIRE(strIndex != 0);
+	}
+
+	REQUIRE(strIndex == 512);
+
+	// If we add one more string, we should wrap
+	REQUIRE(writerTest.GetOrCreateStringIndex("foo", &strIndex) == 0);
+	REQUIRE(strIndex == 1);
+}
+
+TEST_CASE("TestOverflowingThreadTableWraps", "[write]") {
+	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
+		// Just drop the data
+		// We don't need it for this test
+		return 0;
+	});
+
+	// Create a WriterTest instance, so we can access the private methods of Writer
+	fxt::WriterTest writerTest(&writer);
+
+	uint16_t threadIndex;
+	for (int i = 0; i < 128; ++i) {
+		REQUIRE(writerTest.GetOrCreateThreadIndex(1, i, &threadIndex) == 0);
+		// Zero is a reserved index
+		// We should never get it
+		REQUIRE(threadIndex != 0);
+	}
+
+	REQUIRE(threadIndex == 128);
+
+	// If we add one more string, we should wrap
+	REQUIRE(writerTest.GetOrCreateThreadIndex(2, 1, &threadIndex) == 0);
+	REQUIRE(threadIndex == 1);
 }
