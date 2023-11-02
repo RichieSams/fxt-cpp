@@ -11,3 +11,6 @@ generate:
 
 build: generate
 	cmake --build --preset $(CMAKE_PRESET) -j
+
+test: build
+	./build/RelWithDebInfo/tests/src/fxt-test

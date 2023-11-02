@@ -4,8 +4,12 @@
  * Copyright Adrian Astley 2023
  */
 
-#include "fxt.h"
+#pragma once
+
+#include <inttypes.h>
 
 namespace fxt {
+
+typedef uint64_t KernelObjectID;
 
 } // End of namespace fxt
