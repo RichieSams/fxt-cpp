@@ -37,7 +37,7 @@ int Writer::WriteMagicNumberRecord() {
 	return WriteBytesToStream(fxtMagic, ArraySize(fxtMagic));
 }
 
-int Writer::AddProviderInfoRecord(uint32_t providerID, const char *providerName) {
+int Writer::AddProviderInfoRecord(ProviderID providerID, const char *providerName) {
 	const size_t strLen = strlen(providerName);
 	const size_t paddedStrLen = (strLen + 8 - 1) & (-8);
 	const size_t diff = paddedStrLen - strLen;
@@ -71,7 +71,7 @@ int Writer::AddProviderInfoRecord(uint32_t providerID, const char *providerName)
 	return 0;
 }
 
-int Writer::AddProviderSectionRecord(uint32_t providerID) {
+int Writer::AddProviderSectionRecord(ProviderID providerID) {
 	const uint64_t sizeInWords = 1;
 	const uint64_t header = ((uint64_t)(providerID) << 20) | ((uint64_t)(internal::MetadataType::ProviderSection) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Metadata);
 	int ret = WriteUInt64ToStream(header);
@@ -82,7 +82,7 @@ int Writer::AddProviderSectionRecord(uint32_t providerID) {
 	return 0;
 }
 
-int Writer::AddProviderEventRecord(uint32_t providerID, ProviderEventType eventType) {
+int Writer::AddProviderEventRecord(ProviderID providerID, ProviderEventType eventType) {
 	const uint64_t sizeInWords = 1;
 	const uint64_t header = ((uint64_t)(eventType) << 52) | ((uint64_t)(providerID) << 20) | ((uint64_t)(internal::MetadataType::ProviderEvent) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Metadata);
 	int ret = WriteUInt64ToStream(header);
