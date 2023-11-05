@@ -10,6 +10,7 @@
 #include "fxt/event_args.h"
 #include "fxt/internal/constants.h"
 #include "fxt/internal/defines.h"
+#include "fxt/internal/fields.h"
 
 #include <stddef.h>
 #include <stdint.h>

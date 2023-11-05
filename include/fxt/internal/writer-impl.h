@@ -9,10 +9,18 @@
 namespace fxt {
 
 namespace internal {
+
 template <typename... Ts>
 using AllEventArguments = typename std::conjunction<std::is_base_of<EventArgument, std::remove_pointer_t<Ts>>...>::type;
 template <typename... Ts>
 using AllPointers = typename std::conjunction<std::is_pointer<Ts>...>::type;
+
+// Casts an enum's value to its underlying type.
+template <typename T>
+inline constexpr typename std::underlying_type<T>::type ToUnderlyingType(T value) {
+	return static_cast<typename std::underlying_type<T>::type>(value);
+}
+
 } // End of namespace internal
 
 template <typename... Arguments>
@@ -209,7 +217,11 @@ inline int Writer::AddUserspaceObjectRecord(const char *name, KernelObjectID pro
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* pointer value */ 1 + /* argument data */ 0;
 	constexpr size_t numArgs = 0;
-	const uint64_t header = ((uint64_t)(numArgs) << 40) | (uint64_t(nameIndex) << 24) | (uint64_t(threadIndex) << 16) | (uint64_t(sizeInWords) << 4) | uint64_t(internal::RecordType::UserspaceObject);
+	const uint64_t header = internal::UserspaceObjectRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::UserspaceObject)) |
+	                        internal::UserspaceObjectRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::UserspaceObjectRecordFields::ThreadRef::Make(threadIndex) |
+	                        internal::UserspaceObjectRecordFields::NameStringRef::Make(nameIndex) |
+	                        internal::UserspaceObjectRecordFields::ArgumentCount::Make(numArgs);
 	ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -254,7 +266,11 @@ inline int Writer::AddUserspaceObjectRecord(const char *name, KernelObjectID pro
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* pointer value */ 1 + /* argument data */ argumentSizeInWords;
 	constexpr size_t numArgs = sizeof...(Arguments);
-	const uint64_t header = ((uint64_t)(numArgs) << 40) | (uint64_t(nameIndex) << 24) | (uint64_t(threadIndex) << 16) | (uint64_t(sizeInWords) << 4) | uint64_t(internal::RecordType::UserspaceObject);
+	const uint64_t header = internal::UserspaceObjectRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::UserspaceObject)) |
+	                        internal::UserspaceObjectRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::UserspaceObjectRecordFields::ThreadRef::Make(threadIndex) |
+	                        internal::UserspaceObjectRecordFields::NameStringRef::Make(nameIndex) |
+	                        internal::UserspaceObjectRecordFields::ArgumentCount::Make(numArgs);
 	ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -291,7 +307,12 @@ inline int Writer::AddContextSwitchRecord(uint16_t cpuNumber, uint8_t outgoingTh
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing thread ID */ 1 + /* incoming thread ID */ 1 + /* argument data */ 0;
 	constexpr size_t numArgs = 0;
-	const uint64_t header = ((uint64_t)(internal::SchedulingRecordType::ContextSwitch) << 60) | ((uint64_t)(outgoingThreadState) << 36) | ((uint64_t)(cpuNumber) << 20) | ((uint64_t)(numArgs) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Scheduling);
+	const uint64_t header = internal::ContextSwitchRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Scheduling)) |
+	                        internal::ContextSwitchRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ContextSwitchRecordFields::ArgumentCount::Make(numArgs) |
+	                        internal::ContextSwitchRecordFields::CpuNumber::Make(cpuNumber) |
+	                        internal::ContextSwitchRecordFields::OutgoingThreadState::Make(outgoingThreadState) |
+	                        internal::ContextSwitchRecordFields::EventType::Make(internal::ToUnderlyingType(internal::SchedulingRecordType::ContextSwitch));
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -340,7 +361,12 @@ inline int Writer::AddContextSwitchRecord(uint16_t cpuNumber, uint8_t outgoingTh
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing thread ID */ 1 + /* incoming thread ID */ 1 + /* argument data */ argumentSizeInWords;
 	constexpr size_t numArgs = sizeof...(Arguments);
-	const uint64_t header = ((uint64_t)(internal::SchedulingRecordType::ContextSwitch) << 60) | ((uint64_t)(outgoingThreadState) << 36) | ((uint64_t)(cpuNumber) << 20) | ((uint64_t)(numArgs) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Scheduling);
+	const uint64_t header = internal::ContextSwitchRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Scheduling)) |
+	                        internal::ContextSwitchRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ContextSwitchRecordFields::ArgumentCount::Make(numArgs) |
+	                        internal::ContextSwitchRecordFields::CpuNumber::Make(cpuNumber) |
+	                        internal::ContextSwitchRecordFields::OutgoingThreadState::Make(outgoingThreadState) |
+	                        internal::ContextSwitchRecordFields::EventType::Make(internal::ToUnderlyingType(internal::SchedulingRecordType::ContextSwitch));
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -381,7 +407,11 @@ inline int Writer::AddContextSwitchRecord(uint16_t cpuNumber, uint8_t outgoingTh
 inline int Writer::AddThreadWakeupRecord(uint16_t cpuNumber, KernelObjectID wakingThreadID, uint64_t timestamp) {
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* waking thread ID */ 1 + /* argument data */ 0;
 	constexpr size_t numArgs = 0;
-	const uint64_t header = ((uint64_t)(internal::SchedulingRecordType::ThreadWakeup) << 60) | ((uint64_t)(cpuNumber) << 20) | ((uint64_t)(numArgs) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Scheduling);
+	const uint64_t header = internal::ThreadWakeupRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Scheduling)) |
+	                        internal::ThreadWakeupRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ThreadWakeupRecordFields::ArgumentCount::Make(numArgs) |
+	                        internal::ThreadWakeupRecordFields::CpuNumber::Make(cpuNumber) |
+	                        internal::ThreadWakeupRecordFields::EventType::Make(internal::ToUnderlyingType(internal::SchedulingRecordType::ThreadWakeup));
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -419,7 +449,11 @@ inline int Writer::AddThreadWakeupRecord(uint16_t cpuNumber, KernelObjectID waki
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* waking thread ID */ 1 + /* argument data */ argumentSizeInWords;
 	constexpr size_t numArgs = sizeof...(Arguments);
-	const uint64_t header = ((uint64_t)(internal::SchedulingRecordType::ThreadWakeup) << 60) | ((uint64_t)(cpuNumber) << 20) | ((uint64_t)(numArgs) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Scheduling);
+	const uint64_t header = internal::ThreadWakeupRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Scheduling)) |
+	                        internal::ThreadWakeupRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ThreadWakeupRecordFields::ArgumentCount::Make(numArgs) |
+	                        internal::ThreadWakeupRecordFields::CpuNumber::Make(cpuNumber) |
+	                        internal::ThreadWakeupRecordFields::EventType::Make(internal::ToUnderlyingType(internal::SchedulingRecordType::ThreadWakeup));
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -473,7 +507,13 @@ inline int Writer::WriteEventHeaderAndGenericData(internal::EventType eventType,
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* argument data */ 0 + /* extra stuff */ extraSizeInWords;
 	constexpr size_t numArgs = 0;
-	const uint64_t header = ((uint64_t)(nameIndex) << 48) | ((uint64_t)(categoryIndex) << 32) | ((uint64_t)(threadIndex) << 24) | ((uint64_t)(numArgs) << 20) | ((uint64_t)(eventType) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Event);
+	const uint64_t header = internal::EventRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Event)) |
+	                        internal::EventRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::EventRecordFields::EventType::Make(internal::ToUnderlyingType(eventType)) |
+	                        internal::EventRecordFields::ArgumentCount::Make(numArgs) |
+	                        internal::EventRecordFields::ThreadRef::Make(threadIndex) |
+	                        internal::EventRecordFields::CategoryStringRef::Make(categoryIndex) |
+	                        internal::EventRecordFields::NameStringRef::Make(nameIndex);
 	ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -524,7 +564,13 @@ inline int Writer::WriteEventHeaderAndGenericData(internal::EventType eventType,
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* argument data */ argumentSizeInWords + /* extra stuff */ extraSizeInWords;
 	constexpr size_t numArgs = sizeof...(Arguments);
-	const uint64_t header = ((uint64_t)(nameIndex) << 48) | ((uint64_t)(categoryIndex) << 32) | ((uint64_t)(threadIndex) << 24) | ((uint64_t)(numArgs) << 20) | ((uint64_t)(eventType) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Event);
+	const uint64_t header = internal::EventRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Event)) |
+	                        internal::EventRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::EventRecordFields::EventType::Make(internal::ToUnderlyingType(eventType)) |
+	                        internal::EventRecordFields::ArgumentCount::Make(numArgs) |
+	                        internal::EventRecordFields::ThreadRef::Make(threadIndex) |
+	                        internal::EventRecordFields::CategoryStringRef::Make(categoryIndex) |
+	                        internal::EventRecordFields::NameStringRef::Make(nameIndex);
 	ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
