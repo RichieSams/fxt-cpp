@@ -243,7 +243,7 @@ inline int Writer::AddUserspaceObjectRecord(const char *name, KernelObjectID pro
 	// Add up the argument word size
 	// And ensure the argument keys (and string values) are in the string table
 	unsigned argumentSizeInWords = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		argumentSizeInWords += arg->ArgumentSizeInWords();
 
 		ret = arg->InitStringEntries(this);
@@ -266,7 +266,7 @@ inline int Writer::AddUserspaceObjectRecord(const char *name, KernelObjectID pro
 	}
 
 	unsigned wordsWritten = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		unsigned size;
 		ret = arg->WriteArgumentDataToStream(this, &size);
 		if (ret != 0) {
@@ -329,7 +329,7 @@ inline int Writer::AddContextSwitchRecord(uint16_t cpuNumber, uint8_t outgoingTh
 	// Add up the argument word size
 	// And ensure the argument keys (and string values) are in the string table
 	unsigned argumentSizeInWords = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		argumentSizeInWords += arg->ArgumentSizeInWords();
 
 		int ret = arg->InitStringEntries(this);
@@ -362,7 +362,7 @@ inline int Writer::AddContextSwitchRecord(uint16_t cpuNumber, uint8_t outgoingTh
 	}
 
 	unsigned wordsWritten = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		unsigned size;
 		ret = arg->WriteArgumentDataToStream(this, &size);
 		if (ret != 0) {
@@ -408,7 +408,7 @@ inline int Writer::AddThreadWakeupRecord(uint16_t cpuNumber, KernelObjectID waki
 	// Add up the argument word size
 	// And ensure the argument keys (and string values) are in the string table
 	unsigned argumentSizeInWords = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		argumentSizeInWords += arg->ArgumentSizeInWords();
 
 		int ret = arg->InitStringEntries(this);
@@ -436,7 +436,7 @@ inline int Writer::AddThreadWakeupRecord(uint16_t cpuNumber, KernelObjectID waki
 	}
 
 	unsigned wordsWritten = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		unsigned size;
 		ret = arg->WriteArgumentDataToStream(this, &size);
 		if (ret != 0) {
@@ -513,7 +513,7 @@ inline int Writer::WriteEventHeaderAndGenericData(internal::EventType eventType,
 	// Add up the argument word size
 	// And ensure the argument keys (and string values) are in the string table
 	unsigned argumentSizeInWords = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		argumentSizeInWords += arg->ArgumentSizeInWords();
 
 		ret = arg->InitStringEntries(this);
@@ -536,7 +536,7 @@ inline int Writer::WriteEventHeaderAndGenericData(internal::EventType eventType,
 	}
 
 	unsigned wordsWritten = 0;
-	for (EventArgument *arg : std::initializer_list<EventArgument *>{arguments...}) {
+	for (EventArgument *arg : std::initializer_list<EventArgument *>{ arguments... }) {
 		unsigned size;
 		ret = arg->WriteArgumentDataToStream(this, &size);
 		if (ret != 0) {
