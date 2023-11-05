@@ -42,13 +42,17 @@ int Writer::AddProviderInfoRecord(ProviderID providerID, const char *providerNam
 	const size_t paddedStrLen = (strLen + 8 - 1) & (-8);
 	const size_t diff = paddedStrLen - strLen;
 
-	if (paddedStrLen >= std::numeric_limits<uint8_t>::max()) {
+	if (paddedStrLen >= internal::ProviderInfoMetadataRecordFields::kMaxNameLength) {
 		return FXT_ERR_STR_TOO_LONG;
 	}
 
 	// Write the header
 	const uint64_t sizeInWords = 1 + (paddedStrLen / 8);
-	const uint64_t header = ((uint64_t)(strLen) << 52) | ((uint64_t)(providerID) << 20) | ((uint64_t)(internal::MetadataType::ProviderInfo) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Metadata);
+	const uint64_t header = internal::ProviderInfoMetadataRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Metadata)) |
+	                        internal::ProviderInfoMetadataRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ProviderInfoMetadataRecordFields::MetadataType::Make(internal::ToUnderlyingType(internal::MetadataType::ProviderInfo)) |
+	                        internal::ProviderInfoMetadataRecordFields::ProviderID::Make(providerID) |
+	                        internal::ProviderInfoMetadataRecordFields::NameLength::Make(strLen);
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -73,7 +77,10 @@ int Writer::AddProviderInfoRecord(ProviderID providerID, const char *providerNam
 
 int Writer::AddProviderSectionRecord(ProviderID providerID) {
 	const uint64_t sizeInWords = 1;
-	const uint64_t header = ((uint64_t)(providerID) << 20) | ((uint64_t)(internal::MetadataType::ProviderSection) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Metadata);
+	const uint64_t header = internal::ProviderSectionMetadataRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Metadata)) |
+	                        internal::ProviderSectionMetadataRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ProviderSectionMetadataRecordFields::MetadataType::Make(internal::ToUnderlyingType(internal::MetadataType::ProviderSection)) |
+	                        internal::ProviderSectionMetadataRecordFields::ProviderID::Make(providerID);
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -84,7 +91,11 @@ int Writer::AddProviderSectionRecord(ProviderID providerID) {
 
 int Writer::AddProviderEventRecord(ProviderID providerID, ProviderEventType eventType) {
 	const uint64_t sizeInWords = 1;
-	const uint64_t header = ((uint64_t)(eventType) << 52) | ((uint64_t)(providerID) << 20) | ((uint64_t)(internal::MetadataType::ProviderEvent) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Metadata);
+	const uint64_t header = internal::ProviderEventMetadataRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Metadata)) |
+	                        internal::ProviderEventMetadataRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ProviderEventMetadataRecordFields::MetadataType::Make(internal::ToUnderlyingType(internal::MetadataType::ProviderSection)) |
+	                        internal::ProviderEventMetadataRecordFields::ProviderID::Make(providerID) |
+	                        internal::ProviderEventMetadataRecordFields::Event::Make(internal::ToUnderlyingType(eventType));
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -95,7 +106,8 @@ int Writer::AddProviderEventRecord(ProviderID providerID, ProviderEventType even
 
 int Writer::AddInitializationRecord(uint64_t numTicksPerSecond) {
 	const uint64_t sizeInWords = 2;
-	const uint64_t header = ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Initialization);
+	const uint64_t header = internal::InitializationRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Initialization)) |
+	                        internal::InitializationRecordFields::RecordSize::Make(sizeInWords);
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -119,7 +131,11 @@ int Writer::SetProcessName(KernelObjectID processID, const char *name) {
 	// Write the header
 	const uint64_t sizeInWords = /* header */ 1 + /* processID */ 1;
 	const uint64_t numArgs = 0;
-	const uint64_t header = ((uint64_t)(numArgs) << 40) | ((uint64_t)(nameIndex) << 24) | ((uint64_t)(internal::KOIDType::Process) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::KernelObject);
+	const uint64_t header = internal::KernelObjectRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::KernelObject)) |
+	                        internal::KernelObjectRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::KernelObjectRecordFields::ObjectType::Make(internal::ToUnderlyingType(internal::KOIDType::Process)) |
+	                        internal::KernelObjectRecordFields::NameStringRef::Make(nameIndex) |
+	                        internal::KernelObjectRecordFields::ArgumentCount::Make(numArgs);
 	ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -149,8 +165,15 @@ int Writer::SetThreadName(KernelObjectID processID, KernelObjectID threadID, con
 
 	const unsigned argSizeInWords = processArg.ArgumentSizeInWords();
 	const uint64_t sizeInWords = /* header */ 1 + /* threadID */ 1 + /* argument data */ argSizeInWords;
+	if (sizeInWords > internal::KernelObjectRecordFields::kMaxRecordSizeWords) {
+		return FXT_ERR_RECORD_SIZE_TOO_LARGE;
+	}
 	const uint64_t numArgs = 1;
-	const uint64_t header = ((uint64_t)(numArgs) << 40) | ((uint64_t)(nameIndex) << 24) | ((uint64_t)(internal::KOIDType::Thread) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::KernelObject);
+	const uint64_t header = internal::KernelObjectRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::KernelObject)) |
+	                        internal::KernelObjectRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::KernelObjectRecordFields::ObjectType::Make(internal::ToUnderlyingType(internal::KOIDType::Thread)) |
+	                        internal::KernelObjectRecordFields::NameStringRef::Make(nameIndex) |
+	                        internal::KernelObjectRecordFields::ArgumentCount::Make(numArgs);
 	ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -175,7 +198,7 @@ int Writer::SetThreadName(KernelObjectID processID, KernelObjectID threadID, con
 }
 
 int Writer::AddBlobRecord(const char *name, void *data, size_t dataLen, BlobType blobType) {
-	if (dataLen > 0x7FFFFF) {
+	if (dataLen > internal::BlobRecordFields::kMaxBlobLength) {
 		// Blob length is stored in 23 bits
 		return FXT_ERR_DATA_TOO_LONG;
 	}
@@ -191,7 +214,11 @@ int Writer::AddBlobRecord(const char *name, void *data, size_t dataLen, BlobType
 
 	// Write the header
 	const uint64_t sizeInWords = 1 + (paddedSize / 8);
-	const uint64_t header = ((uint64_t)(blobType) << 48) | ((uint64_t)(dataLen) << 24) | ((uint64_t)(nameIndex) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Blob);
+	const uint64_t header = internal::BlobRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Blob)) |
+	                        internal::BlobRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::BlobRecordFields::NameStringRef::Make(nameIndex) |
+	                        internal::BlobRecordFields::BlobSize::Make(dataLen) |
+	                        internal::BlobRecordFields::BlobType::Make(internal::ToUnderlyingType(blobType));
 	ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -256,7 +283,10 @@ int Writer::AddStringRecord(uint16_t stringIndex, const char *str, size_t strLen
 
 	// Write the header
 	const uint64_t sizeInWords = 1 + (paddedStrLen / 8);
-	const uint64_t header = ((uint64_t)(strLen) << 32) | ((uint64_t)(stringIndex) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::String);
+	const uint64_t header = internal::StringRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::String)) |
+	                        internal::StringRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::StringRecordFields::StringIndex::Make(stringIndex) |
+	                        internal::StringRecordFields::StringLength::Make(strLen);
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
@@ -280,10 +310,11 @@ int Writer::AddStringRecord(uint16_t stringIndex, const char *str, size_t strLen
 }
 
 int Writer::AddThreadRecord(uint16_t threadIndex, KernelObjectID processID, KernelObjectID threadID) {
-	const uint64_t sizeInWords = 3;
-	const uint64_t header = ((uint64_t)(threadIndex) << 16) | ((uint64_t)(sizeInWords) << 4) | (uint64_t)(internal::RecordType::Thread);
-
 	// Write the header
+	const uint64_t sizeInWords = 3;
+	const uint64_t header = internal::ThreadRecordFields::Type::Make(internal::ToUnderlyingType(internal::RecordType::Thread)) |
+	                        internal::ThreadRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::ThreadRecordFields::ThreadIndex::Make(threadIndex);
 	int ret = WriteUInt64ToStream(header);
 	if (ret != 0) {
 		return ret;
