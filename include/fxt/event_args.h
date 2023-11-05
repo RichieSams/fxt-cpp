@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "fxt/defines.h"
+#include "fxt/internal/defines.h"
 
 #include <inttypes.h>
 

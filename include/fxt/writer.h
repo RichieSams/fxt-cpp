@@ -9,6 +9,7 @@
 #include "fxt/err.h"
 #include "fxt/event_args.h"
 #include "fxt/internal/constants.h"
+#include "fxt/internal/defines.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -115,7 +116,7 @@ public:
 	 *
 	 * @see https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/docs/reference/tracing/trace-format.md#provider-info-metadata
 	 */
-	int AddProviderInfoRecord(uint32_t providerID, const char *providerName);
+	int AddProviderInfoRecord(ProviderID providerID, const char *providerName);
 	/**
 	 * @brief Adds a provider section metadata record to the stream.
 	 *
@@ -124,7 +125,7 @@ public:
 	 *
 	 * @see https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/docs/reference/tracing/trace-format.md#provider-section-metadata
 	 */
-	int AddProviderSectionRecord(uint32_t providerID);
+	int AddProviderSectionRecord(ProviderID providerID);
 	/**
 	 * @brief Adds a provider event metadata record to the stream.
 	 *
@@ -134,7 +135,7 @@ public:
 	 *
 	 * @see https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/docs/reference/tracing/trace-format.md#provider-event-metadata
 	 */
-	int AddProviderEventRecord(uint32_t providerID, ProviderEventType eventType);
+	int AddProviderEventRecord(ProviderID providerID, ProviderEventType eventType);
 	/**
 	 * @brief Adds an initialization record to the stream.
 	 *

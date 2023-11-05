@@ -10,6 +10,7 @@
 
 namespace fxt {
 
-typedef uint64_t KernelObjectID;
+using ProviderID = uint32_t;
+using KernelObjectID = uint64_t;
 
 } // End of namespace fxt
