@@ -18,6 +18,13 @@
 
 namespace fxt {
 
+/**
+ * @brief A user-defined function for how FXT stream data should be written
+ *
+ * @param userContext    The userContext value passed to the Writer constructor
+ * @param data           The data to write
+ * @param len            The length of the data array
+ */
 typedef int (*WriteFunc)(void *userContext, const void *data, size_t len);
 
 /**
