@@ -767,10 +767,6 @@ int AddInstantEvent(Writer *writer, const char *category, const char *name, Kern
 	return WriteEventHeaderAndGenericData(writer, internal::EventType::Instant, category, name, processID, threadID, timestamp, extraSizeInWords, args, numArgs);
 }
 
-int AddCounterEvent(Writer *writer, const char *category, const char *name, KernelObjectID processID, KernelObjectID threadID, uint64_t timestamp, uint64_t counterID) {
-	return AddCounterEvent(writer, category, name, processID, threadID, timestamp, counterID, nullptr, 0);
-}
-
 int AddCounterEvent(Writer *writer, const char *category, const char *name, KernelObjectID processID, KernelObjectID threadID, uint64_t timestamp, uint64_t counterID, std::initializer_list<RecordArgument> args) {
 	return AddCounterEvent(writer, category, name, processID, threadID, timestamp, counterID, args.begin(), args.size());
 }
