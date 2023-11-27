@@ -10,6 +10,7 @@ project(
 set(SRC_FILES
 	${PROJECT_SOURCE_DIR}/main.cpp
 	${PROJECT_SOURCE_DIR}/write.cpp
+	${PROJECT_SOURCE_DIR}/writer_test.h
 )
 
 # ---- Create test binary ----
