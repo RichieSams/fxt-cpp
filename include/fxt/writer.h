@@ -226,21 +226,6 @@ int AddInstantEvent(Writer *writer, const char *category, const char *name, Kern
  * @param threadID     The thread ID
  * @param timestamp    The timestamp of the event
  * @param counterID    The counter ID
- * @return             0 on success. Non-zero for failure
- *
- * @see https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/docs/reference/tracing/trace-format.md#counter-event
- */
-int AddCounterEvent(Writer *writer, const char *category, const char *name, KernelObjectID processID, KernelObjectID threadID, uint64_t timestamp, uint64_t counterID);
-/**
- * @brief Adds a counter event record to the stream.
- *
- * @param writer       The writer to use
- * @param category     The category of the event
- * @param name         The name of the event
- * @param processID    The process ID
- * @param threadID     The thread ID
- * @param timestamp    The timestamp of the event
- * @param counterID    The counter ID
  * @param args         Arguments to add to the event
  * @return             0 on success. Non-zero for failure
  *
