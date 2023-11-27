@@ -1134,6 +1134,60 @@ int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingT
 	return 0;
 }
 
+int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectID threadID, KernelObjectID outgoingFiberID, KernelObjectID incomingFiberID, uint64_t timestamp) {
+	return AddFiberSwitchRecord(writer, processID, threadID, outgoingFiberID, incomingFiberID, timestamp, nullptr, 0);
+}
+
+int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectID threadID, KernelObjectID outgoingFiberID, KernelObjectID incomingFiberID, uint64_t timestamp, std::initializer_list<RecordArgument> args) {
+	return AddFiberSwitchRecord(writer, processID, threadID, outgoingFiberID, incomingFiberID, timestamp, args.begin(), args.size());
+}
+
+int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectID threadID, KernelObjectID outgoingFiberID, KernelObjectID incomingFiberID, uint64_t timestamp, const RecordArgument *args, size_t numArgs) {
+	// Add up the argument word size
+	unsigned argumentSizeInWords = GetArgSizeInWords(args, numArgs);
+
+	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing fiber ID */ 1 + /* incoming fiber ID */ 1 + /* argument data */ argumentSizeInWords;
+	const uint64_t header = internal::FiberSwitchRecordFields::Type::Make(ToUnderlyingType(internal::RecordType::Scheduling)) |
+	                        internal::FiberSwitchRecordFields::RecordSize::Make(sizeInWords) |
+	                        internal::FiberSwitchRecordFields::ArgumentCount::Make(numArgs) |
+	                        internal::FiberSwitchRecordFields::EventType::Make(ToUnderlyingType(internal::SchedulingRecordType::FiberSwitch));
+	int ret = WriteUInt64ToStream(writer, header);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = WriteUInt64ToStream(writer, timestamp);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = WriteUInt64ToStream(writer, (uint64_t)outgoingFiberID);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = WriteUInt64ToStream(writer, (uint64_t)incomingFiberID);
+	if (ret != 0) {
+		return ret;
+	}
+
+	unsigned wordsWritten = 0;
+	for (size_t i = 0; i < numArgs; ++i) {
+		unsigned size;
+		ret = WriteArg(writer, &args[i], &size);
+		if (ret != 0) {
+			return ret;
+		}
+		wordsWritten += size;
+	}
+
+	if (wordsWritten != argumentSizeInWords) {
+		return FXT_ERR_WRITE_LENGTH_MISMATCH;
+	}
+
+	return 0;
+}
+
 int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wakingThreadID, uint64_t timestamp) {
 	return AddThreadWakeupRecord(writer, cpuNumber, wakingThreadID, timestamp, nullptr, 0);
 }

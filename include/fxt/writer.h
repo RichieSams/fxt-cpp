@@ -699,7 +699,7 @@ int AddFlowEndEvent(Writer *writer, const char *category, const char *name, Kern
 int AddBlobRecord(Writer *writer, const char *name, void *data, size_t dataLen, BlobType blobType);
 
 /**
- * @brief Adds a userspace object record to the stream with accompanying argument data.
+ * @brief Adds a userspace object record to the stream.
  *
  * @param writer          The writer to use
  * @param name            The name of the userspace object
@@ -711,7 +711,7 @@ int AddBlobRecord(Writer *writer, const char *name, void *data, size_t dataLen, 
  */
 int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID processID, KernelObjectID threadID, uintptr_t pointerValue);
 /**
- * @brief Adds a userspace object record to the stream with accompanying argument data.
+ * @brief Adds a userspace object record to the stream.
  *
  * @param writer          The writer to use
  * @param name            The name of the userspace object
@@ -724,7 +724,7 @@ int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID pr
  */
 int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID processID, KernelObjectID threadID, uintptr_t pointerValue, std::initializer_list<RecordArgument> args);
 /**
- * @brief Adds a userspace object record to the stream with accompanying argument data.
+ * @brief Adds a userspace object record to the stream.
  *
  * @param writer          The writer to use
  * @param name            The name of the userspace object
@@ -739,7 +739,7 @@ int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID pr
 int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID processID, KernelObjectID threadID, uintptr_t pointerValue, const RecordArgument *args, size_t numArgs);
 
 /**
- * @brief Adds a context switch scheduling record to the stream with accompanying argument data.
+ * @brief Adds a context switch scheduling record to the stream.
  *
  * @note By convention, the caller may optionally include the following named arguments to provide additiona information to trace consumers:
  *     - "incoming_weight": Int32 describing the relative weight of the incoming thread
@@ -757,7 +757,7 @@ int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID pr
  */
 int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingThreadState, KernelObjectID outgoingThreadID, KernelObjectID incomingThreadID, uint64_t timestamp);
 /**
- * @brief Adds a context switch scheduling record to the stream with accompanying argument data.
+ * @brief Adds a context switch scheduling record to the stream.
  *
  * @note By convention, the caller may optionally include the following named arguments to provide additiona information to trace consumers:
  *     - "incoming_weight": Int32 describing the relative weight of the incoming thread
@@ -776,7 +776,7 @@ int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingT
  */
 int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingThreadState, KernelObjectID outgoingThreadID, KernelObjectID incomingThreadID, uint64_t timestamp, std::initializer_list<RecordArgument> args);
 /**
- * @brief Adds a context switch scheduling record to the stream with accompanying argument data.
+ * @brief Adds a context switch scheduling record to the stream.
  *
  * @note By convention, the caller may optionally include the following named arguments to provide additiona information to trace consumers:
  *     - "incoming_weight": Int32 describing the relative weight of the incoming thread
@@ -797,7 +797,54 @@ int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingT
 int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingThreadState, KernelObjectID outgoingThreadID, KernelObjectID incomingThreadID, uint64_t timestamp, const RecordArgument *args, size_t numArgs);
 
 /**
- * @brief Adds a thread wakeup scheduling record to the stream with accompanying argument data.
+ * @brief Adds a fiber switch scheduling record to the stream.
+ *
+ * @note This is an unofficial record type
+ *
+ * @param writer             The writer to use
+ * @param processID          The process ID
+ * @param threadID           The thread ID
+ * @param outgoingFiberID    The outgoing fiber ID
+ * @param incomingFiberID    The incoming fiber ID
+ * @param timestamp          The timestamp of the event
+ * @return
+ */
+int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectID threadID, KernelObjectID outgoingFiberID, KernelObjectID incomingFiberID, uint64_t timestamp);
+/**
+ * @brief Adds a fiber switch scheduling record to the stream.
+ *
+ * @note This is an unofficial record type
+ *
+ * @param writer             The writer to use
+ * @param processID          The process ID
+ * @param threadID           The thread ID
+ * @param outgoingFiberID    The outgoing fiber ID
+ * @param incomingFiberID    The incoming fiber ID
+ * @param timestamp          The timestamp of the event
+ * @param args               Arguments to add to the event
+ * @param numArgs            The number of arguments
+ * @return
+ */
+int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectID threadID, KernelObjectID outgoingFiberID, KernelObjectID incomingFiberID, uint64_t timestamp, std::initializer_list<RecordArgument> args);
+/**
+ * @brief Adds a fiber switch scheduling record to the stream.
+ *
+ * @note This is an unofficial record type
+ *
+ * @param writer             The writer to use
+ * @param processID          The process ID
+ * @param threadID           The thread ID
+ * @param outgoingFiberID    The outgoing fiber ID
+ * @param incomingFiberID    The incoming fiber ID
+ * @param timestamp          The timestamp of the event
+ * @param args               Arguments to add to the event
+ * @param numArgs            The number of arguments
+ * @return
+ */
+int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectID threadID, KernelObjectID outgoingFiberID, KernelObjectID incomingFiberID, uint64_t timestamp, const RecordArgument *args, size_t numArgs);
+
+/**
+ * @brief Adds a thread wakeup scheduling record to the stream.
  *
  * @note By convention, the caller may optionally include the following named arguments to provide additional information to trace consumers:
  *     - "weight": Int32 describing the relative weight of the waking thread
@@ -812,7 +859,7 @@ int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingT
  */
 int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wakingThreadID, uint64_t timestamp);
 /**
- * @brief Adds a thread wakeup scheduling record to the stream with accompanying argument data.
+ * @brief Adds a thread wakeup scheduling record to the stream.
  *
  * @note By convention, the caller may optionally include the following named arguments to provide additional information to trace consumers:
  *     - "weight": Int32 describing the relative weight of the waking thread
@@ -828,7 +875,7 @@ int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wak
  */
 int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wakingThreadID, uint64_t timestamp, std::initializer_list<RecordArgument> args);
 /**
- * @brief Adds a thread wakeup scheduling record to the stream with accompanying argument data.
+ * @brief Adds a thread wakeup scheduling record to the stream.
  *
  * @note By convention, the caller may optionally include the following named arguments to provide additional information to trace consumers:
  *     - "weight": Int32 describing the relative weight of the waking thread

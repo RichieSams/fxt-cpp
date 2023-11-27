@@ -77,6 +77,7 @@ enum class KOIDType {
 enum class SchedulingRecordType {
 	ContextSwitch = 1,
 	ThreadWakeup = 2,
+	FiberSwitch = 3,
 };
 
 } // End of namespace internal

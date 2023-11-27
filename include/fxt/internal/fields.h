@@ -196,6 +196,10 @@ struct ContextSwitchRecordFields : SchedulingRecordFields {
 	using OutgoingThreadState = Field<36, 39>;
 };
 
+struct FiberSwitchRecordFields : SchedulingRecordFields {
+	using ArgumentCount = Field<16, 19>;
+};
+
 struct ThreadWakeupRecordFields : SchedulingRecordFields {
 	using ArgumentCount = Field<16, 19>;
 	using CpuNumber = Field<20, 35>;
