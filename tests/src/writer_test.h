@@ -10,22 +10,10 @@
 
 namespace fxt {
 
-class WriterTest {
-public:
-	WriterTest(Writer *writer)
-	        : m_writer(writer) {
-	}
+int GetOrCreateStringIndex(Writer *writer, const char *str, uint16_t *strIndex);
+int GetOrCreateThreadIndex(Writer *writer, KernelObjectID processID, KernelObjectID threadID, uint16_t *threadIndex);
 
-private:
-	Writer *m_writer;
-
-public:
-	int GetOrCreateStringIndex(const char *str, uint16_t *strIndex) {
-		return m_writer->GetOrCreateStringIndex(str, strIndex);
-	}
-	int GetOrCreateThreadIndex(KernelObjectID processID, KernelObjectID threadID, uint16_t *threadIndex) {
-		return m_writer->GetOrCreateThreadIndex(processID, threadID, threadIndex);
-	}
-};
+unsigned GetArgSizeInWords(const RecordArgument *args, size_t numArgs);
+int WriteArg(Writer *writer, const RecordArgument *arg, unsigned *wordsWritten);
 
 } // End of namespace fxt

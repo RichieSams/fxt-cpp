@@ -2,10 +2,10 @@ set(SRC_FILES
     ${PROJECT_SOURCE_DIR}/include/fxt/internal/constants.h
 	${PROJECT_SOURCE_DIR}/include/fxt/internal/defines.h
 	${PROJECT_SOURCE_DIR}/include/fxt/internal/fields.h
+	${PROJECT_SOURCE_DIR}/include/fxt/internal/pairs.h
 	${PROJECT_SOURCE_DIR}/include/fxt/err.h
-	${PROJECT_SOURCE_DIR}/include/fxt/event_args.h
     ${PROJECT_SOURCE_DIR}/include/fxt/writer.h
-    ${PROJECT_SOURCE_DIR}/src/event_args.cpp
+	${PROJECT_SOURCE_DIR}/include/fxt/record_args.h
     ${PROJECT_SOURCE_DIR}/src/writer.cpp
     ${PROJECT_SOURCE_DIR}/src/xxhash.h
 )

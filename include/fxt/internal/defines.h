@@ -13,4 +13,11 @@ namespace fxt {
 using ProviderID = uint32_t;
 using KernelObjectID = uint64_t;
 
+namespace internal {
+
+using StringRef = uint16_t;
+using ThreadRef = uint16_t;
+
+}; // End of namespace internal
+
 } // End of namespace fxt

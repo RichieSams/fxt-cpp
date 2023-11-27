@@ -77,6 +77,28 @@ struct Field {
 	}
 };
 
+struct ArgumentFields {
+	using Type = Field<0, 3>;
+	using ArgumentSize = Field<4, 15>;
+	using NameRef = Field<16, 31>;
+};
+
+struct Int32ArgumentFields : ArgumentFields {
+	using Value = Field<32, 63>;
+};
+
+struct UInt32ArgumentFields : ArgumentFields {
+	using Value = Field<32, 63>;
+};
+
+struct StringArgumentFields : ArgumentFields {
+	using ValueRef = Field<32, 47>;
+};
+
+struct BoolArgumentFields : ArgumentFields {
+	using Value = Field<32, 32>;
+};
+
 struct RecordFields {
 	static constexpr uint64_t kMaxRecordSizeWords = 0xfff;
 	static constexpr uint64_t kMaxRecordSizeBytes = WordsToBytes(kMaxRecordSizeWords);
@@ -120,6 +142,13 @@ struct MagicNumberRecordFields : TraceInfoMetadataRecordFields {
 };
 
 using InitializationRecordFields = RecordFields;
+
+struct StringRefFields {
+	static constexpr uint16_t MaxInlineStrLen = 0x7fff;
+	static constexpr uint16_t Inline(int strLen) {
+		return (uint16_t)0x8000 | (uint16_t)strLen;
+	}
+};
 
 struct StringRecordFields : RecordFields {
 	using StringIndex = Field<16, 30>;
