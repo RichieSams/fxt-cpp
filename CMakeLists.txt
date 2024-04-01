@@ -18,6 +18,14 @@ endif()
 
 option(FXT_BUILD_TESTS "Build test programs" ON)
 
+# ---- Workarounds ----
+
+# Workaround for OSX currently having a broken linker
+# https://github.com/Homebrew/homebrew-core/issues/145991
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-ld_classic")
+endif()
+
 # ---- Add source files ----
 add_subdirectory(src)
 
