@@ -40,10 +40,11 @@ public:
 	        : type(internal::ArgumentType::Double),
 	          doubleValue(value) {
 	}
-	explicit RecordArgumentValue(const char *value)
+	explicit RecordArgumentValue(const char *value, bool useStringTable = false)
 	        : type(internal::ArgumentType::String),
 	          stringValue(value),
-	          stringLen(strlen(value)) {
+	          stringLen(strlen(value)),
+	          useStringTable(useStringTable) {
 	}
 	template <typename T>
 	explicit RecordArgumentValue(T *value)
@@ -66,10 +67,11 @@ public:
 		arg.koidValue = value;
 		return arg;
 	}
-	static RecordArgumentValue CharArray(char *value, unsigned valueLen) {
+	static RecordArgumentValue CharArray(char *value, unsigned valueLen, bool useStringTable = false) {
 		RecordArgumentValue arg(internal::ArgumentType::String);
 		arg.stringValue = value;
 		arg.stringLen = valueLen;
+		arg.useStringTable = useStringTable;
 		return arg;
 	}
 
@@ -87,19 +89,48 @@ public:
 		bool boolValue;
 	};
 	size_t stringLen;
+	bool useStringTable;
+};
+
+struct RecordArgumentName {
+	RecordArgumentName(const char *name, size_t nameLen, bool useStringTable)
+	        : name(name),
+	          nameLen(nameLen),
+	          useStringTable(useStringTable) {
+	}
+
+	const char *name;
+	size_t nameLen;
+	bool useStringTable;
 };
 
 struct RecordArgument {
 	explicit RecordArgument(const char *name, RecordArgumentValue value)
+	        : name(RecordArgumentName(name, strlen(name), false)),
+	          value(value) {
+	}
+	explicit RecordArgument(RecordArgumentName name, RecordArgumentValue value)
 	        : name(name),
-	          nameLen(strlen(name)),
 	          value(value) {
 	}
 	~RecordArgument() = default;
 
-	const char *name;
-	size_t nameLen;
+	RecordArgumentName name;
 	RecordArgumentValue value;
 };
+
+namespace internal {
+
+#define FXT_MAX_NUM_ARGS 15
+
+struct ProcessedRecordArgument {
+	uint16_t nameStringRef;
+	uint16_t nameSizeInWords;
+
+	uint16_t valueStringRef;
+	uint16_t headerAndValueSizeInWords;
+};
+
+} // End of namespace internal
 
 } // End of namespace fxt
