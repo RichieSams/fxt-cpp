@@ -98,6 +98,11 @@ struct RecordArgumentName {
 	          nameLen(nameLen),
 	          useStringTable(useStringTable) {
 	}
+	RecordArgumentName(const char *name, bool useStringTable)
+	        : name(name),
+	          nameLen(strlen(name)),
+	          useStringTable(useStringTable) {
+	}
 
 	const char *name;
 	size_t nameLen;
