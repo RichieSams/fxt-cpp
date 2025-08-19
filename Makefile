@@ -28,7 +28,6 @@ all: build
 #################################
 
 generate:
-	cmake --version
 	cmake --preset=$(CMAKE_PRESET) .
 
 build: generate
@@ -39,16 +38,8 @@ build: generate
 # Testing
 #################################
 
-
-generate:
-	cmake --preset $(CMAKE_PRESET) ./
-
-build: generate
-	cmake --build --preset $(CMAKE_PRESET) -j
-
 test: build
 	./$(TEST_DIR)/tests/src/fxt-test$(EXT)
-
 
 
 #################################
