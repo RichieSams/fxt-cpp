@@ -5,7 +5,7 @@
  */
 
 /**
- * The macros below are borrowed from the trace library
+ * The macros below are inspired by the trace library
  * https://fuchsia.googlesource.com/fuchsia/+/9cf01c788257/zircon/system/ulib/trace/include/lib/trace/internal/pairs_internal.h
  *
  * Fuchsia is is governed by a BSD-style license
@@ -35,79 +35,46 @@
 
 #pragma once
 
+// Multiple expansion layers to ensure proper macro processing
+#define FXT_INTERNAL_EXPAND(...) __VA_ARGS__
+#define FXT_INTERNAL_EXPAND2(...) FXT_INTERNAL_EXPAND(__VA_ARGS__)
+#define FXT_INTERNAL_EXPAND3(...) FXT_INTERNAL_EXPAND2(__VA_ARGS__)
+
 /**
- * Count the number of pairs of arguments passed to it without evaluating them.
+ * @brief Count the number of pairs in the argument list
+ *
  * When the number of arguments is uneven, rounds down.
  * Works with 0 to 15 pairs.
  */
 #define FXT_INTERNAL_COUNT_PAIRS(...) \
-	FXT_INTERNAL_COUNT_PAIRS_(__VA_ARGS__, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0)
-#define FXT_INTERNAL_COUNT_PAIRS_(_15, _15X, _14, _14X, _13, _13X, _12, _12X, _11, _11X, _10, _10X, _9, _9X, _8, _8X, _7, _7X, _6, _6X, _5, _5X, _4, _4X, _3, _3X, _2, _2X, _1, _1X, N, ...) \
-	N
+	FXT_INTERNAL_EXPAND(FXT_INTERNAL_COUNT_PAIRS_(__VA_ARGS__, 15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0))
 
-// Applies a function or macro to each pair of arguments to produce a
-// comma-separated result.  Works with 0 to 15 pairs.
-//
-// Example:
-//     #define MY_FN(a, b)
-//     FXT_INTERNAL_APPLY_PAIRWISE_CSV(MY_FN, "x", 1, "y", 2)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV(fn, ...)                            \
-	FXT_INTERNAL_APPLY_PAIRWISE_CSV_(FXT_INTERNAL_COUNT_PAIRS(__VA_ARGS__)) \
-	(fn, __VA_ARGS__)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV_(n) FXT_INTERNAL_APPLY_PAIRWISE_CSV__(n)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV__(n) FXT_INTERNAL_APPLY_PAIRWISE_CSV##n
+#define FXT_INTERNAL_COUNT_PAIRS_(_15, _15X, _14, _14X, _13, _13X, _12, _12X, _11, _11X, _10, _10X, _9, _9X, _8, _8X, _7, _7X, _6, _6X, _5, _5X, _4, _4X, _3, _3X, _2, _2X, _1, _1X, N, ...) N
 
-// clang-format off
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV0(...)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV1(fn, k1, v1) \
-	fn(k1, v1)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV2(fn, k1, v1, k2, v2) \
-	fn(k1, v1), fn(k2, v2)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV3(fn, k1, v1, k2, v2, k3, v3) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV4(fn, k1, v1, k2, v2, k3, v3, k4, v4) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV5(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                  \
-	fn(k5, v5)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV6(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                          \
-	fn(k5, v5), fn(k6, v6)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV7(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                  \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV8(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                          \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV9(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                                  \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8),                                                                  \
-	fn(k9, v9)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV10(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                                             \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8),                                                                             \
-	fn(k9, v9), fn(k10, v10)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV11(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10, k11, v11) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                                                       \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8),                                                                                       \
-	fn(k9, v9), fn(k10, v10), fn(k11, v11)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV12(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10, k11, v11, k12, v12) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                                                                 \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8),                                                                                                 \
-	fn(k9, v9), fn(k10, v10), fn(k11, v11), fn(k12, v12)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV13(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10, k11, v11, k12, v12, k13, v13) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                                                                           \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8),                                                                                                           \
-	fn(k9, v9), fn(k10, v10), fn(k11, v11), fn(k12, v12),                                                                                                     \
-	fn(k13, v13)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV14(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10, k11, v11, k12, v12, k13, v13, k14, v14) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                                                                                     \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8),                                                                                                                     \
-	fn(k9, v9), fn(k10, v10), fn(k11, v11), fn(k12, v12),                                                                                                               \
-	fn(k13, v13), fn(k14, v14)
-#define FXT_INTERNAL_APPLY_PAIRWISE_CSV15(fn, k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10, k11, v11, k12, v12, k13, v13, k14, v14, k15, v15) \
-	fn(k1, v1), fn(k2, v2), fn(k3, v3), fn(k4, v4),                                                                                                                               \
-	fn(k5, v5), fn(k6, v6), fn(k7, v7), fn(k8, v8),                                                                                                                               \
-	fn(k9, v9), fn(k10, v10), fn(k11, v11), fn(k12, v12),                                                                                                                         \
-	fn(k13, v13), fn(k14, v14), fn(k15, v15)
-// clang-format on
+// Implementation macros for different pair counts
+#define FXT_INTERNAL_SELECT_0(fn, ...) /* empty */
+#define FXT_INTERNAL_SELECT_1(fn, ...) /* empty */
+#define FXT_INTERNAL_SELECT_2(fn, a, b, ...) fn(a, b)
+#define FXT_INTERNAL_SELECT_3(fn, a, b, ...) fn(a, b)
+#define FXT_INTERNAL_SELECT_4(fn, a, b, c, d, ...) fn(a, b), fn(c, d)
+#define FXT_INTERNAL_SELECT_5(fn, a, b, c, d, ...) fn(a, b), fn(c, d)
+#define FXT_INTERNAL_SELECT_6(fn, a, b, c, d, e, f, ...) fn(a, b), fn(c, d), fn(e, f)
+#define FXT_INTERNAL_SELECT_7(fn, a, b, c, d, e, f, ...) fn(a, b), fn(c, d), fn(e, f)
+#define FXT_INTERNAL_SELECT_8(fn, a, b, c, d, e, f, g, h, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h)
+#define FXT_INTERNAL_SELECT_9(fn, a, b, c, d, e, f, g, h, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h)
+#define FXT_INTERNAL_SELECT_10(fn, a, b, c, d, e, f, g, h, i, j, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j)
+#define FXT_INTERNAL_SELECT_11(fn, a, b, c, d, e, f, g, h, i, j, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j)
+#define FXT_INTERNAL_SELECT_12(fn, a, b, c, d, e, f, g, h, i, j, k, l, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l)
+#define FXT_INTERNAL_SELECT_13(fn, a, b, c, d, e, f, g, h, i, j, k, l, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l)
+#define FXT_INTERNAL_SELECT_14(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n)
+#define FXT_INTERNAL_SELECT_15(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n)
+
+// Helper macros for indirection and selection
+#define FXT_INTERNAL_SELECT_HELPER(N) FXT_INTERNAL_SELECT_##N
+#define FXT_INTERNAL_SELECT(N) FXT_INTERNAL_SELECT_HELPER(N)
+
+/**
+ * Applies the given fn to each pair of arguments
+ */
+#define FXT_INTERNAL_APPLY_PAIRWISE_CSV(fn, ...) \
+	FXT_INTERNAL_EXPAND3(FXT_INTERNAL_SELECT(FXT_INTERNAL_EXPAND(FXT_INTERNAL_COUNT_PAIRS(__VA_ARGS__)))(fn, __VA_ARGS__))
