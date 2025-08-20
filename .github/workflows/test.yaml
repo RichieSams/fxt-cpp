@@ -68,9 +68,6 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - name: windows_vs_2019
-            os: windows-2019
-            compiler_version: 2019
           - name: windows_vs_2022
             os: windows-2022
             compiler_version: 2022
