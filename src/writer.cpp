@@ -301,7 +301,7 @@ static int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArg
 			break;
 		case internal::ArgumentType::String: {
 			if (args[i].value.useStringTable) {
-				int ret = GetOrCreateStringIndex(writer, args[i].value.stringValue, args[i].value.stringLen, &processedArgs[i].nameStringRef);
+				int ret = GetOrCreateStringIndex(writer, args[i].value.stringValue, args[i].value.stringLen, &processedArgs[i].valueStringRef);
 				if (ret != 0) {
 					return ret;
 				}
