@@ -44,7 +44,8 @@ public:
 	        : type(internal::ArgumentType::String),
 	          stringValue(value),
 	          stringLen(strlen(value)),
-	          useStringTable(useStringTable) {
+	          useStringTable(useStringTable),
+	          hexEncode(false) {
 	}
 	template <typename T>
 	explicit RecordArgumentValue(T *value)
@@ -72,6 +73,26 @@ public:
 		arg.stringValue = value;
 		arg.stringLen = valueLen;
 		arg.useStringTable = useStringTable;
+		arg.hexEncode = false;
+		return arg;
+	}
+
+	/**
+	 * @brief Encodes raw bytes as a hex string
+	 *
+	 * @param value             The byte array to encode
+	 * @param valueLen          The length of value
+	 * @return                  The constructed value
+	 */
+	static RecordArgumentValue HexArray(uint8_t *value, unsigned valueLen) {
+		RecordArgumentValue arg(internal::ArgumentType::String);
+		arg.stringValue = (char *)value;
+		arg.stringLen = valueLen;
+		// For ease of code maintenance, since hex arrays are dynamically
+		// generated, and we don't want to do memory allocation, we don't allow them to be
+		// in the string table
+		arg.useStringTable = false;
+		arg.hexEncode = true;
 		return arg;
 	}
 
@@ -90,6 +111,7 @@ public:
 	};
 	size_t stringLen;
 	bool useStringTable;
+	bool hexEncode;
 };
 
 struct RecordArgumentName {

@@ -300,21 +300,35 @@ static int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArg
 			processedArgs[i].headerAndValueSizeInWords = 2;
 			break;
 		case internal::ArgumentType::String: {
-			if (args[i].value.useStringTable) {
-				int ret = GetOrCreateStringIndex(writer, args[i].value.stringValue, args[i].value.stringLen, &processedArgs[i].valueStringRef);
-				if (ret != 0) {
-					return ret;
-				}
-				processedArgs[i].headerAndValueSizeInWords = 1;
-			} else {
-				if (args[i].value.stringLen > internal::StringRefFields::MaxInlineStrLen) {
+			if (args[i].value.hexEncode) {
+				// Hex encoding takes up two chars per byte
+				size_t encodedLen = args[i].value.stringLen * 2;
+
+				if (encodedLen > internal::StringRefFields::MaxInlineStrLen) {
 					return FXT_ERR_ARG_STR_VALUE_TOO_LONG;
 				}
 
-				processedArgs[i].valueStringRef = internal::StringRefFields::Inline(args[i].value.stringLen);
-				const size_t paddedValueStrLen = (args[i].value.stringLen + 8 - 1) & (-8);
+				processedArgs[i].valueStringRef = internal::StringRefFields::Inline(encodedLen);
+				const size_t paddedValueStrLen = (encodedLen + 8 - 1) & (-8);
 				processedArgs[i].headerAndValueSizeInWords = 1 + paddedValueStrLen / 8;
+			} else {
+				if (args[i].value.useStringTable) {
+					int ret = GetOrCreateStringIndex(writer, args[i].value.stringValue, args[i].value.stringLen, &processedArgs[i].valueStringRef);
+					if (ret != 0) {
+						return ret;
+					}
+					processedArgs[i].headerAndValueSizeInWords = 1;
+				} else {
+					if (args[i].value.stringLen > internal::StringRefFields::MaxInlineStrLen) {
+						return FXT_ERR_ARG_STR_VALUE_TOO_LONG;
+					}
+
+					processedArgs[i].valueStringRef = internal::StringRefFields::Inline(args[i].value.stringLen);
+					const size_t paddedValueStrLen = (args[i].value.stringLen + 8 - 1) & (-8);
+					processedArgs[i].headerAndValueSizeInWords = 1 + paddedValueStrLen / 8;
+				}
 			}
+
 			break;
 		}
 		case internal::ArgumentType::Pointer:
@@ -546,7 +560,49 @@ static int WriteArg(Writer *writer, const RecordArgument *arg, internal::Process
 		}
 
 		// Write the value string if we're using inline strings
-		if (!arg->value.useStringTable) {
+		if (arg->value.hexEncode) {
+			static const char hexChars[] = "0123456789abcdef";
+
+			size_t encodedLen = arg->value.stringLen * 2;
+			size_t diff = (processedArg->headerAndValueSizeInWords - 1) * 8 - encodedLen;
+
+			char buffer[256];
+			static_assert(sizeof(buffer) % 2 == 0, "buffer must be an even size, so we can guarantee we have space for both chars per byte");
+			size_t offset = 0;
+			size_t writtenBytes = 0;
+
+			// Start encoding in blocks
+			for (size_t i = 0; i < arg->value.stringLen; ++i) {
+				if (offset > sizeof(buffer)) {
+					ret = WriteBytesToStream(writer, buffer, sizeof(buffer));
+					if (ret != 0) {
+						return ret;
+					}
+
+					offset = 0;
+				}
+
+				buffer[offset] = hexChars[(arg->value.stringValue[i] >> 4) & 0x0F];
+				buffer[offset + 1] = hexChars[(arg->value.stringValue[i]) & 0x0F];
+
+				offset += 2;
+			}
+
+			// Flush any remaining bytes
+			if (offset > 0) {
+				ret = WriteBytesToStream(writer, buffer, offset);
+				if (ret != 0) {
+					return ret;
+				}
+			}
+
+			if (diff > 0) {
+				ret = WriteZeroPadding(writer, diff);
+				if (ret != 0) {
+					return ret;
+				}
+			}
+		} else if (!arg->value.useStringTable) {
 			size_t diff = (processedArg->headerAndValueSizeInWords - 1) * 8 - arg->value.stringLen;
 			ret = WriteBytesToStream(writer, arg->value.stringValue, arg->value.stringLen);
 			if (ret != 0) {
