@@ -305,7 +305,7 @@ static int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArg
 				if (ret != 0) {
 					return ret;
 				}
-				processedArgs[i].headerAndValueSizeInWords = 0;
+				processedArgs[i].headerAndValueSizeInWords = 1;
 			} else {
 				if (args[i].value.stringLen > internal::StringRefFields::MaxInlineStrLen) {
 					return FXT_ERR_ARG_STR_VALUE_TOO_LONG;
