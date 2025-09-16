@@ -547,7 +547,7 @@ static int WriteArg(Writer *writer, const RecordArgument *arg, internal::Process
 
 		// Write the value string if we're using inline strings
 		if (!arg->value.useStringTable) {
-			unsigned diff = processedArg->headerAndValueSizeInWords * 8 - arg->value.stringLen;
+			size_t diff = (processedArg->headerAndValueSizeInWords - 1) * 8 - arg->value.stringLen;
 			ret = WriteBytesToStream(writer, arg->value.stringValue, arg->value.stringLen);
 			if (ret != 0) {
 				return ret;
