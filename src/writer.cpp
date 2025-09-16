@@ -313,7 +313,7 @@ static int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArg
 
 				processedArgs[i].valueStringRef = internal::StringRefFields::Inline(args[i].value.stringLen);
 				const size_t paddedValueStrLen = (args[i].value.stringLen + 8 - 1) & (-8);
-				processedArgs[i].headerAndValueSizeInWords = paddedValueStrLen / 8;
+				processedArgs[i].headerAndValueSizeInWords = 1 + paddedValueStrLen / 8;
 			}
 			break;
 		}
