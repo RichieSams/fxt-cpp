@@ -38,7 +38,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 
-namespace fxt::internal {
+namespace fxt {
 
 inline constexpr size_t Pad(size_t size) {
 	return size + ((8 - (size & 7)) & 7);
@@ -227,4 +227,4 @@ struct BlobFormatEventFields {
 	using ThreadRef = Field<36, 43>;
 };
 
-} // namespace fxt::internal
+} // namespace fxt

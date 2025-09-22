@@ -7,13 +7,14 @@
 #pragma once
 
 #include "fxt/writer.h"
+#include "record_args.h"
 
 namespace fxt {
 
 int GetOrCreateStringIndex(Writer *writer, const char *str, uint16_t *strIndex);
 int GetOrCreateThreadIndex(Writer *writer, KernelObjectID processID, KernelObjectID threadID, uint16_t *threadIndex);
 
-unsigned GetArgSizeInWords(const RecordArgument *args, size_t numArgs);
-int WriteArg(Writer *writer, const RecordArgument *arg, unsigned *wordsWritten);
+int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, ProcessedRecordArgument *processedArgs);
+int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument *processedArg, unsigned *wordsWritten);
 
 } // End of namespace fxt
