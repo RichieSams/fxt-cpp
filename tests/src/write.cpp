@@ -215,14 +215,7 @@ TEST_CASE("TestProviderInfoMetadataRecord", "[write]") {
 	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
 
 	// Validate the header fields
-	uint64_t header = (uint64_t)buffer[0] |
-	                  (uint64_t)buffer[1] << 8 |
-	                  (uint64_t)buffer[2] << 16 |
-	                  (uint64_t)buffer[3] << 24 |
-	                  (uint64_t)buffer[4] << 32 |
-	                  (uint64_t)buffer[5] << 40 |
-	                  (uint64_t)buffer[6] << 48 |
-	                  (uint64_t)buffer[7] << 56;
+	uint64_t header = ReadUInt64(&buffer[0]);
 	INFO("Header: " << std::showbase << std::hex << header);
 
 	// Record type
@@ -268,14 +261,7 @@ TEST_CASE("TestProviderSectionMetadataRecord", "[write]") {
 	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
 
 	// Validate the header fields
-	uint64_t header = (uint64_t)buffer[0] |
-	                  (uint64_t)buffer[1] << 8 |
-	                  (uint64_t)buffer[2] << 16 |
-	                  (uint64_t)buffer[3] << 24 |
-	                  (uint64_t)buffer[4] << 32 |
-	                  (uint64_t)buffer[5] << 40 |
-	                  (uint64_t)buffer[6] << 48 |
-	                  (uint64_t)buffer[7] << 56;
+	uint64_t header = ReadUInt64(&buffer[0]);
 	INFO("Header: " << std::showbase << std::hex << header);
 
 	// Record type
@@ -310,14 +296,7 @@ TEST_CASE("TestProviderEventMetadataRecord", "[write]") {
 	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
 
 	// Validate the header fields
-	uint64_t header = (uint64_t)buffer[0] |
-	                  (uint64_t)buffer[1] << 8 |
-	                  (uint64_t)buffer[2] << 16 |
-	                  (uint64_t)buffer[3] << 24 |
-	                  (uint64_t)buffer[4] << 32 |
-	                  (uint64_t)buffer[5] << 40 |
-	                  (uint64_t)buffer[6] << 48 |
-	                  (uint64_t)buffer[7] << 56;
+	uint64_t header = ReadUInt64(&buffer[0]);
 	INFO("Header: " << std::showbase << std::hex << header);
 
 	// Record type
@@ -351,14 +330,7 @@ TEST_CASE("TestMagicNumberRecord", "[write]") {
 	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
 
 	// Validate the header fields
-	uint64_t header = (uint64_t)buffer[0] |
-	                  (uint64_t)buffer[1] << 8 |
-	                  (uint64_t)buffer[2] << 16 |
-	                  (uint64_t)buffer[3] << 24 |
-	                  (uint64_t)buffer[4] << 32 |
-	                  (uint64_t)buffer[5] << 40 |
-	                  (uint64_t)buffer[6] << 48 |
-	                  (uint64_t)buffer[7] << 56;
+	uint64_t header = ReadUInt64(&buffer[0]);
 	INFO("Header: " << std::showbase << std::hex << header);
 
 	// Record type
@@ -373,4 +345,37 @@ TEST_CASE("TestMagicNumberRecord", "[write]") {
 	REQUIRE(GetFieldFromValue(24, 55, header) == 0x16547846);
 	// The rest should be zero
 	REQUIRE(GetFieldFromValue(56, 63, header) == 0);
+}
+
+TEST_CASE("TestInitializationRecord", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	const uint64_t numTicksPerSecond = 8723538789381374;
+
+	REQUIRE(fxt::AddInitializationRecord(&writer, numTicksPerSecond) == 0);
+
+	// The record should be the header (8 bytes) plus a uint64 (8 bytes)
+	uint64_t expectedRecordSizeInWords = 2;
+	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
+
+	// Validate the header fields
+	uint64_t header = ReadUInt64(&buffer[0]);
+	INFO("Header: " << std::showbase << std::hex << header);
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::Initialization);
+	// Record size in multiples of uint64_t
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedRecordSizeInWords);
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(16, 63, header) == 0);
+
+	uint64_t actualTicksPerSecond = ReadUInt64(&buffer[8]);
+	REQUIRE(actualTicksPerSecond == numTicksPerSecond);
 }
