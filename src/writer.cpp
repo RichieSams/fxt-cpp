@@ -165,6 +165,11 @@ static int AddStringRecord(Writer *writer, uint16_t stringIndex, const char *str
 }
 
 static int GetOrCreateStringIndex(Writer *writer, const char *str, size_t strLen, uint16_t *strIndex) {
+	const size_t paddedStrLen = (strLen + 8 - 1) & (-8);
+	if (paddedStrLen >= 0x7fff) {
+		return FXT_ERR_STR_TOO_LONG;
+	}
+
 	// Hash the string
 	const uint64_t hash = XXH3_64bits(str, strLen);
 
