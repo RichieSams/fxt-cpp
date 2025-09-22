@@ -100,7 +100,7 @@ int AddProviderEventRecord(Writer *writer, ProviderID providerID, ProviderEventT
 	const uint64_t sizeInWords = 1;
 	const uint64_t header = ProviderEventMetadataRecordFields::Type::Make(ToUnderlyingType(RecordType::Metadata)) |
 	                        ProviderEventMetadataRecordFields::RecordSize::Make(sizeInWords) |
-	                        ProviderEventMetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::ProviderSection)) |
+	                        ProviderEventMetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::ProviderEvent)) |
 	                        ProviderEventMetadataRecordFields::ProviderID::Make(providerID) |
 	                        ProviderEventMetadataRecordFields::Event::Make(ToUnderlyingType(eventType));
 	int ret = WriteUInt64ToStream(writer, header);
