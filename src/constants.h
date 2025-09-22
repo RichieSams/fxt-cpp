@@ -28,6 +28,11 @@ enum class MetadataType {
 	ProviderInfo = 1,
 	ProviderSection = 2,
 	ProviderEvent = 3,
+	TraceInfo = 4,
+};
+
+enum class TraceInfoType {
+	MagicNumberRecord = 0,
 };
 
 enum class EventType {
