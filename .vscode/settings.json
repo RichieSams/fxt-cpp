@@ -1,7 +1,7 @@
 {
     "testMate.cpp.test.advancedExecutables": [
         {
-            "pattern": "{build,Build,BUILD,out,Out,OUT}/**/*{test,Test,TEST}*",
+            "pattern": "build/*/tests/src/fxt-test*",
             "cwd": "${absDirpath}",
             "runTask": {
                 "before": [
@@ -10,6 +10,36 @@
             }
         }
     ],
+    "testMate.cpp.debug.configTemplate": {
+        "type": "cppvsdbg",
+        "linux": {
+            "type": "cppdbg",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        "darwin": {
+            "type": "cppdbg",
+            "MIMode": "lldb"
+        },
+        "win32": {
+            "type": "cppvsdbg"
+        },
+        "program": "${exec}",
+        "args": "${argsArrayFlat}",
+        "cwd": "${cwd}",
+        "env": "${envObj}",
+        "environment": "${envObjArray}",
+        "sourceFileMap": "${sourceFileMapObj}",
+        "stopAtEntry": false,
+        "externalConsole": false
+    },
+    "testMate.cpp.debug.breakOnFailure": true,
     "files.associations": {
         "bitset": "cpp",
         "string": "cpp",
