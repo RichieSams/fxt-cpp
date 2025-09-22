@@ -7,9 +7,6 @@
 #pragma once
 
 #include "fxt/err.h"
-#include "fxt/internal/constants.h"
-#include "fxt/internal/defines.h"
-#include "fxt/internal/fields.h"
 #include "fxt/record_args.h"
 
 #include <stddef.h>
@@ -19,6 +16,27 @@
 #include <type_traits>
 
 namespace fxt {
+
+/**
+ * Defines
+ */
+
+using ProviderID = uint32_t;
+using KernelObjectID = uint64_t;
+
+enum class BlobType {
+	Data = 1,
+	LastBranch = 2,
+	Perfetto = 3,
+};
+
+enum class ProviderEventType {
+	BufferFilledUp = 0,
+};
+
+/**
+ * Writer class definitions and functions
+ */
 
 /**
  * @brief A user-defined function for how FXT stream data should be written
@@ -894,47 +912,5 @@ int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wak
 
 } // End of namespace fxt
 
-#define FXT_INTERNAL_DECLARE_ARG(name, value) \
+#define FXT_DECLARE_ARG(name, value) \
 	fxt::RecordArgument(name, fxt::RecordArgumentValue(value))
-
-#define FXT_ADD_INSTANT_EVENT(writer, category, name, processID, threadID, timestamp, ...) \
-	AddInstantEvent(writer, category, name, processID, threadID, timestamp, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_COUNTER_EVENT(writer, category, name, processID, threadID, timestamp, counterID, ...) \
-	AddCounterEvent(writer, category, name, processID, threadID, timestamp, counterID, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_DURATION_BEGIN_EVENT(writer, category, name, processID, threadID, timestamp, ...) \
-	AddDurationBeginEvent(writer, category, name, processID, threadID, timestamp, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_DURATION_END_EVENT(writer, category, name, processID, threadID, timestamp, ...) \
-	AddDurationEndEvent(writer, category, name, processID, threadID, timestamp, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_DURATION_COMPLETE_EVENT(writer, category, name, processID, threadID, beginTimestamp, endTimestamp, ...) \
-	AddDurationCompleteEvent(writer, category, name, processID, threadID, beginTimestamp, endTimestamp, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_ASYNC_BEGIN_EVENT(writer, category, name, processID, threadID, timestamp, asyncCorrelationID, ...) \
-	AddAsyncBeginEvent(writer, category, name, processID, threadID, timestamp, asyncCorrelationID, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_ASYNC_INSTANT_EVENT(writer, category, name, processID, threadID, timestamp, asyncCorrelationID, ...) \
-	AddAsyncInstantEvent(writer, category, name, processID, threadID, timestamp, asyncCorrelationID, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_ASYNC_END_EVENT(writer, category, name, processID, threadID, timestamp, asyncCorrelationID, ...) \
-	AddAsyncEndEvent(writer, category, name, processID, threadID, timestamp, asyncCorrelationID, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_FLOW_BEGIN_EVENT(writer, category, name, processID, threadID, timestamp, flowCorrelationID, ...) \
-	AddFlowBeginEvent(writer, category, name, processID, threadID, timestamp, flowCorrelationID, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_FLOW_STEP_EVENT(writer, category, name, processID, threadID, timestamp, flowCorrelationID, ...) \
-	AddFlowStepEvent(writer, category, name, processID, threadID, timestamp, flowCorrelationID, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_FLOW_END_EVENT(writer, category, name, processID, threadID, timestamp, flowCorrelationID, ...) \
-	AddFlowEndEvent(writer, category, name, processID, threadID, timestamp, flowCorrelationID, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_USERSPACE_OBJECT_RECORD(writer, name, processID, threadID, pointerValue, ...) \
-	AddUserspaceObjectRecord(writer, name, processID, threadID, pointerValue, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_CONTEXT_SWITCH_RECORD(writer, cpuNumber, outgoingThreadState, outgoingThreadID, incomingThreadID, timestamp, ...) \
-	AddContextSwitchRecord(writer, cpuNumber, outgoingThreadState, outgoingThreadID, incomingThreadID, timestamp, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })
-
-#define FXT_ADD_THREAD_WAKEUP_RECORD(writer, cpuNumber, wakingThreadID, timestamp, ...) \
-	AddThreadWakeupRecord(writer, cpuNumber, wakingThreadID, timestamp, { FXT_INTERNAL_APPLY_PAIRWISE_CSV(FXT_INTERNAL_DECLARE_ARG, __VA_ARGS__) })

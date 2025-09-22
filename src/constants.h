@@ -10,18 +10,6 @@
 
 namespace fxt {
 
-enum class BlobType {
-	Data = 1,
-	LastBranch = 2,
-	Perfetto = 3,
-};
-
-enum class ProviderEventType {
-	BufferFilledUp = 0,
-};
-
-namespace internal {
-
 enum class RecordType {
 	Metadata = 0,
 	Initialization = 1,
@@ -40,19 +28,6 @@ enum class MetadataType {
 	ProviderInfo = 1,
 	ProviderSection = 2,
 	ProviderEvent = 3,
-};
-
-enum class ArgumentType {
-	Null = 0,
-	Int32 = 1,
-	UInt32 = 2,
-	Int64 = 3,
-	UInt64 = 4,
-	Double = 5,
-	String = 6,
-	Pointer = 7,
-	KOID = 8,
-	Bool = 9,
 };
 
 enum class EventType {
@@ -79,7 +54,5 @@ enum class SchedulingRecordType {
 	ThreadWakeup = 2,
 	FiberSwitch = 3,
 };
-
-} // End of namespace internal
 
 } // End of namespace fxt

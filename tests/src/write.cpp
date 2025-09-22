@@ -63,29 +63,29 @@ TEST_CASE("TestGeneralWrite", "[write]") {
 	REQUIRE(AddDurationEndEvent(&writer, "CategoryA", "Process server response", 3, 45, 1200) == 0);
 
 	// Add some counter events
-	REQUIRE(FXT_ADD_COUNTER_EVENT(&writer, "Bar", "CounterA", 3, 45, 250, 555, "int_arg", 111, "uint_arg", (uint32_t)984, "double_arg", 1.0, "int64_arg", (int64_t)851, "uint64_arg", (uint64_t)35) == 0);
-	REQUIRE(FXT_ADD_COUNTER_EVENT(&writer, "Bar", "CounterA", 3, 45, 500, 555, "int_arg", 784, "uint_arg", (uint32_t)561, "double_arg", 4.0, "int64_arg", (int64_t)445, "uint64_arg", (uint64_t)95) == 0);
-	REQUIRE(FXT_ADD_COUNTER_EVENT(&writer, "Bar", "CounterA", 3, 45, 700, 555, "int_arg", 333, "uint_arg", (uint32_t)845, "double_arg", 9.0, "int64_arg", (int64_t)521, "uint64_arg", (uint64_t)24) == 0);
+	REQUIRE(AddCounterEvent(&writer, "Bar", "CounterA", 3, 45, 250, 555, FXT_ARG_LIST("int_arg", 111, "uint_arg", (uint32_t)984, "double_arg", 1.0, "int64_arg", (int64_t)851, "uint64_arg", (uint64_t)35)) == 0);
+	REQUIRE(AddCounterEvent(&writer, "Bar", "CounterA", 3, 45, 500, 555, FXT_ARG_LIST("int_arg", 784, "uint_arg", (uint32_t)561, "double_arg", 4.0, "int64_arg", (int64_t)445, "uint64_arg", (uint64_t)95)) == 0);
+	REQUIRE(AddCounterEvent(&writer, "Bar", "CounterA", 3, 45, 700, 555, FXT_ARG_LIST("int_arg", 333, "uint_arg", (uint32_t)845, "double_arg", 9.0, "int64_arg", (int64_t)521, "uint64_arg", (uint64_t)24)) == 0);
 
 	// Add a blob record
 	REQUIRE(AddBlobRecord(&writer, "TestBlob", (void *)"testing123", 10, fxt::BlobType::Data) == 0);
 
 	// Add events with argument data
-	REQUIRE(FXT_ADD_DURATION_BEGIN_EVENT(&writer, "Foo", "Root", 3, 87, 1200, "null_arg", nullptr) == 0);
-	REQUIRE(FXT_ADD_INSTANT_EVENT(&writer, "OtherThing", "EventHappened", 3, 87, 1300, "int_arg", 4567) == 0);
-	REQUIRE(FXT_ADD_DURATION_BEGIN_EVENT(&writer, "Foo", "Inner", 3, 87, 1400, "uint_arg", (uint32_t)333) == 0);
-	REQUIRE(FXT_ADD_ASYNC_BEGIN_EVENT(&writer, "Asdf", "AsyncThing2", 3, 87, 1450, 222, "int64_arg", (int64_t)784) == 0);
-	REQUIRE(FXT_ADD_DURATION_COMPLETE_EVENT(&writer, "OtherService", "DoStuff", 3, 87, 1500, 800, "uint64_arg", (uint64_t)454) == 0);
-	REQUIRE(FXT_ADD_ASYNC_INSTANT_EVENT(&writer, "Asdf", "AsyncInstant2", 3, 26, 1825, 222, "double_arg", 333.3424) == 0);
-	REQUIRE(FXT_ADD_ASYNC_END_EVENT(&writer, "Asdf", "AsyncThing2", 3, 26, 1850, 222, "string_arg", "str_value") == 0);
-	REQUIRE(FXT_ADD_USERSPACE_OBJECT_RECORD(&writer, "MyAwesomeObject", 3, 26, (uintptr_t)(67890), "bool_arg", true) == 0);
-	REQUIRE(FXT_ADD_DURATION_END_EVENT(&writer, "Foo", "Inner", 3, 87, 1900, "pointer_arg", &writer) == 0);
-	REQUIRE(FXT_ADD_DURATION_END_EVENT(&writer, "Foo", "Root", 3, 87, 1900, "koid_arg", fxt::RecordArgumentValue::KOID(3)) == 0);
+	REQUIRE(AddDurationBeginEvent(&writer, "Foo", "Root", 3, 87, 1200, FXT_ARG_LIST("null_arg", nullptr)) == 0);
+	REQUIRE(AddInstantEvent(&writer, "OtherThing", "EventHappened", 3, 87, 1300, FXT_ARG_LIST("int_arg", 4567)) == 0);
+	REQUIRE(AddDurationBeginEvent(&writer, "Foo", "Inner", 3, 87, 1400, FXT_ARG_LIST("uint_arg", (uint32_t)333)) == 0);
+	REQUIRE(AddAsyncBeginEvent(&writer, "Asdf", "AsyncThing2", 3, 87, 1450, 222, FXT_ARG_LIST("int64_arg", (int64_t)784)) == 0);
+	REQUIRE(AddDurationCompleteEvent(&writer, "OtherService", "DoStuff", 3, 87, 1500, 800, FXT_ARG_LIST("uint64_arg", (uint64_t)454)) == 0);
+	REQUIRE(AddAsyncInstantEvent(&writer, "Asdf", "AsyncInstant2", 3, 26, 1825, 222, FXT_ARG_LIST("double_arg", 333.3424)) == 0);
+	REQUIRE(AddAsyncEndEvent(&writer, "Asdf", "AsyncThing2", 3, 26, 1850, 222, FXT_ARG_LIST("string_arg", "str_value")) == 0);
+	REQUIRE(AddUserspaceObjectRecord(&writer, "MyAwesomeObject", 3, 26, (uintptr_t)(67890), FXT_ARG_LIST("bool_arg", true)) == 0);
+	REQUIRE(AddDurationEndEvent(&writer, "Foo", "Inner", 3, 87, 1900, FXT_ARG_LIST("pointer_arg", &writer)) == 0);
+	REQUIRE(AddDurationEndEvent(&writer, "Foo", "Root", 3, 87, 1900, FXT_ARG_LIST("koid_arg", fxt::RecordArgumentValue::KOID(3))) == 0);
 
 	// Add some scheduling events
-	FXT_ADD_CONTEXT_SWITCH_RECORD(&writer, 3, 1, 45, 87, 250, "incoming_weight", 2, "outgoing_weight", 4);
-	FXT_ADD_CONTEXT_SWITCH_RECORD(&writer, 3, 1, 87, 45, 255, "incoming_weight", 2, "outgoing_weight", 4);
-	FXT_ADD_THREAD_WAKEUP_RECORD(&writer, 3, 45, 925, "weight", 5);
+	AddContextSwitchRecord(&writer, 3, 1, 45, 87, 250, FXT_ARG_LIST("incoming_weight", 2, "outgoing_weight", 4));
+	AddContextSwitchRecord(&writer, 3, 1, 87, 45, 255, FXT_ARG_LIST("incoming_weight", 2, "outgoing_weight", 4));
+	AddThreadWakeupRecord(&writer, 3, 45, 925, FXT_ARG_LIST("weight", 5));
 }
 
 TEST_CASE("TestUsingSameStringReturnsSameIndex", "[write]") {
