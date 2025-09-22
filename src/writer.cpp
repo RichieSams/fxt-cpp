@@ -38,6 +38,8 @@ static int WriteBytesToStream(Writer *writer, const void *val, size_t len);
 static int WriteZeroPadding(Writer *writer, size_t count);
 
 int WriteMagicNumberRecord(Writer *writer) {
+	// This record does follow "real" record / metadata record header patterns.
+	// However, given the value is static, we just directly hardcode the byte values
 	const char fxtMagic[] = { 0x10, 0x00, 0x04, 0x46, 0x78, 0x54, 0x16, 0x00 };
 	return WriteBytesToStream(writer, fxtMagic, ArraySize(fxtMagic));
 }

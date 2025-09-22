@@ -6,9 +6,14 @@
 
 #include "fxt/writer.h"
 
+#include "constants.h"
+
 #include "writer_test.h"
+#include "writer_validation.h"
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
+#include "catch2/matchers/catch_matchers_vector.hpp"
 
 #include <stdio.h>
 #include <vector>
@@ -187,4 +192,185 @@ TEST_CASE("TestOverflowingThreadTableWraps", "[write]") {
 	// If we add one more thread, we should wrap
 	REQUIRE(GetOrCreateThreadIndex(&writer, 2, 1, &threadIndex) == 0);
 	REQUIRE(threadIndex == 1);
+}
+
+TEST_CASE("TestProviderInfoMetadataRecord", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	const uint64_t providerID = 128563;
+	const char *providerName = "abcdefghi";
+
+	REQUIRE(fxt::AddProviderInfoRecord(&writer, providerID, providerName) == 0);
+
+	// The record should be a header (8 bytes) plus the length of the name, padded to the
+	// next multiple of 8 bytes. (16 bytes)
+	uint64_t expectedRecordSizeInWords = 3;
+	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
+
+	// Validate the header fields
+	uint64_t header = (uint64_t)buffer[0] |
+	                  (uint64_t)buffer[1] << 8 |
+	                  (uint64_t)buffer[2] << 16 |
+	                  (uint64_t)buffer[3] << 24 |
+	                  (uint64_t)buffer[4] << 32 |
+	                  (uint64_t)buffer[5] << 40 |
+	                  (uint64_t)buffer[6] << 48 |
+	                  (uint64_t)buffer[7] << 56;
+	INFO("Header: " << std::showbase << std::hex << header);
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::Metadata);
+	// Record size in multiples of uint64_t
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedRecordSizeInWords);
+	// Metadata type
+	REQUIRE(GetFieldFromValue(16, 19, header) == (uint64_t)fxt::MetadataType::ProviderInfo);
+	// Provider ID
+	REQUIRE(GetFieldFromValue(20, 51, header) == providerID);
+	// Name length
+	const uint64_t nameLen = GetFieldFromValue(52, 59, header);
+	REQUIRE(nameLen == strlen(providerName));
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(60, 63, header) == 0);
+
+	// Check the name string
+	std::string actualName(buffer.begin() + 8, buffer.begin() + (8 + nameLen));
+	REQUIRE_THAT(actualName, Catch::Matchers::Equals(providerName));
+
+	// Check that the remaining bytes are all zero
+	std::vector<uint8_t> expectedZeros(5, 0);
+	std::vector<uint8_t> actualBytes(buffer.begin() + 19, buffer.end());
+	REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+}
+
+TEST_CASE("TestProviderSectionMetadataRecord", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	const uint64_t providerID = 128563;
+
+	REQUIRE(fxt::AddProviderSectionRecord(&writer, providerID) == 0);
+
+	// The record should just be a header (8 bytes)
+	uint64_t expectedRecordSizeInWords = 1;
+	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
+
+	// Validate the header fields
+	uint64_t header = (uint64_t)buffer[0] |
+	                  (uint64_t)buffer[1] << 8 |
+	                  (uint64_t)buffer[2] << 16 |
+	                  (uint64_t)buffer[3] << 24 |
+	                  (uint64_t)buffer[4] << 32 |
+	                  (uint64_t)buffer[5] << 40 |
+	                  (uint64_t)buffer[6] << 48 |
+	                  (uint64_t)buffer[7] << 56;
+	INFO("Header: " << std::showbase << std::hex << header);
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::Metadata);
+	// Record size in multiples of uint64_t
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedRecordSizeInWords);
+	// Metadata type
+	REQUIRE(GetFieldFromValue(16, 19, header) == (uint64_t)fxt::MetadataType::ProviderSection);
+	// Provider ID
+	REQUIRE(GetFieldFromValue(20, 51, header) == providerID);
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(52, 63, header) == 0);
+}
+
+TEST_CASE("TestProviderEventMetadataRecord", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	const uint64_t providerID = 128563;
+	const fxt::ProviderEventType providerEvent = fxt::ProviderEventType::BufferFilledUp;
+
+	REQUIRE(fxt::AddProviderEventRecord(&writer, providerID, providerEvent) == 0);
+
+	// The record should just be a header (8 bytes)
+	uint64_t expectedRecordSizeInWords = 1;
+	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
+
+	// Validate the header fields
+	uint64_t header = (uint64_t)buffer[0] |
+	                  (uint64_t)buffer[1] << 8 |
+	                  (uint64_t)buffer[2] << 16 |
+	                  (uint64_t)buffer[3] << 24 |
+	                  (uint64_t)buffer[4] << 32 |
+	                  (uint64_t)buffer[5] << 40 |
+	                  (uint64_t)buffer[6] << 48 |
+	                  (uint64_t)buffer[7] << 56;
+	INFO("Header: " << std::showbase << std::hex << header);
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::Metadata);
+	// Record size in multiples of uint64_t
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedRecordSizeInWords);
+	// Metadata type
+	REQUIRE(GetFieldFromValue(16, 19, header) == (uint64_t)fxt::MetadataType::ProviderEvent);
+	// Provider ID
+	REQUIRE(GetFieldFromValue(20, 51, header) == providerID);
+	// Provider event type
+	REQUIRE(GetFieldFromValue(52, 55, header) == (uint64_t)providerEvent);
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(52, 63, header) == 0);
+}
+
+TEST_CASE("TestMagicNumberRecord", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	REQUIRE(fxt::WriteMagicNumberRecord(&writer) == 0);
+
+	// The record should only be the header (8 bytes)
+	uint64_t expectedRecordSizeInWords = 1;
+	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
+
+	// Validate the header fields
+	uint64_t header = (uint64_t)buffer[0] |
+	                  (uint64_t)buffer[1] << 8 |
+	                  (uint64_t)buffer[2] << 16 |
+	                  (uint64_t)buffer[3] << 24 |
+	                  (uint64_t)buffer[4] << 32 |
+	                  (uint64_t)buffer[5] << 40 |
+	                  (uint64_t)buffer[6] << 48 |
+	                  (uint64_t)buffer[7] << 56;
+	INFO("Header: " << std::showbase << std::hex << header);
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::Metadata);
+	// Record size in multiples of uint64_t
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedRecordSizeInWords);
+	// Metadata type
+	REQUIRE(GetFieldFromValue(16, 19, header) == (uint64_t)fxt::MetadataType::TraceInfo);
+	// Trace info type
+	REQUIRE(GetFieldFromValue(20, 23, header) == (uint64_t)fxt::TraceInfoType::MagicNumberRecord);
+	// The actual magic number
+	REQUIRE(GetFieldFromValue(24, 55, header) == 0x16547846);
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(56, 63, header) == 0);
 }

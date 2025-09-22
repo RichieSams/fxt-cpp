@@ -11,6 +11,8 @@
 
 namespace fxt {
 
+// Define functions that are implemented in writer.cpp so we can test them directly
+
 int GetOrCreateStringIndex(Writer *writer, const char *str, uint16_t *strIndex);
 int GetOrCreateThreadIndex(Writer *writer, KernelObjectID processID, KernelObjectID threadID, uint16_t *threadIndex);
 
