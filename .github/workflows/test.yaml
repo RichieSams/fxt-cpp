@@ -33,23 +33,23 @@ jobs:
         run: make CMAKE_PRESET=Unix_x64_Release generate build test
   darwin:
     name: ${{ matrix.config.name }}
-    runs-on: macOS-13
+    runs-on: macOS-15
     strategy:
       fail-fast: false
       matrix:
         config:
           - name: darwin_gcc_12
             brew_package: gcc@12
-            cc: /usr/local/opt/gcc@12/bin/gcc-12
-            cxx: /usr/local/opt/gcc@12/bin/g++-12
+            cc: /opt/homebrew/opt/gcc@12/bin/gcc-12
+            cxx: /opt/homebrew/opt/gcc@12/bin/g++-12
           - name: darwin_clang_15
             brew_package: llvm@15
-            cc: /usr/local/opt/llvm@15/bin/clang
-            cxx: /usr/local/opt/llvm@15/bin/clang++
+            cc: /opt/homebrew/opt/llvm@15/bin/clang
+            cxx: /opt/homebrew/opt/llvm@15/bin/clang++
           - name: darwin_clang_17
             brew_package: llvm@17
-            cc: /usr/local/opt/llvm@17/bin/clang
-            cxx: /usr/local/opt/llvm@17/bin/clang++
+            cc: /opt/homebrew/opt/llvm@17/bin/clang
+            cxx: /opt/homebrew/opt/llvm@17/bin/clang++
     env:
       CC: ${{ matrix.config.cc }}
       CXX: ${{ matrix.config.cxx }}
