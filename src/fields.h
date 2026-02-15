@@ -198,6 +198,7 @@ struct ContextSwitchRecordFields : SchedulingRecordFields {
 
 struct FiberSwitchRecordFields : SchedulingRecordFields {
 	using ArgumentCount = Field<16, 19>;
+	using ThreadRef = Field<20, 27>;
 };
 
 struct ThreadWakeupRecordFields : SchedulingRecordFields {

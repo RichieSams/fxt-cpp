@@ -1305,8 +1305,14 @@ int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectI
 		return FXT_ERR_TOO_MANY_ARGS;
 	}
 
+	uint16_t threadIndex;
+	int ret = GetOrCreateThreadIndex(writer, processID, threadID, &threadIndex);
+	if (ret != 0) {
+		return ret;
+	}
+
 	ProcessedRecordArgument processedArgs[FXT_MAX_NUM_ARGS];
-	int ret = ProcessArgs(writer, args, numArgs, processedArgs);
+	ret = ProcessArgs(writer, args, numArgs, processedArgs);
 	if (ret != 0) {
 		return ret;
 	}
@@ -1321,6 +1327,7 @@ int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectI
 	const uint64_t header = FiberSwitchRecordFields::Type::Make(ToUnderlyingType(RecordType::Scheduling)) |
 	                        FiberSwitchRecordFields::RecordSize::Make(sizeInWords) |
 	                        FiberSwitchRecordFields::ArgumentCount::Make(numArgs) |
+	                        FiberSwitchRecordFields::ThreadRef::Make(threadIndex) |
 	                        FiberSwitchRecordFields::EventType::Make(ToUnderlyingType(SchedulingRecordType::FiberSwitch));
 	ret = WriteUInt64ToStream(writer, header);
 	if (ret != 0) {
