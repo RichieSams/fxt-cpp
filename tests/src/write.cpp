@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <vector>
 
+static uint64_t ValidateStringTableRecord(uint8_t *buffer, const char *expectedValue, uint16_t expectedValueStrRef);
+
 TEST_CASE("TestGeneralWrite", "[write]") {
 	std::vector<uint8_t> buffer;
 
@@ -378,4 +380,1417 @@ TEST_CASE("TestInitializationRecord", "[write]") {
 
 	uint64_t actualTicksPerSecond = ReadUInt64(&buffer[8]);
 	REQUIRE(actualTicksPerSecond == numTicksPerSecond);
+}
+
+TEST_CASE("TestStringRecord", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	const char *expectedStringValue;
+	uint64_t stringValueLen;
+	uint64_t paddedStrLen;
+
+	SECTION("Uneven string length") {
+		// String is not a multiple of 8 bytes
+		// Meaning it needs to be padded
+		expectedStringValue = "abcdefghi";
+		stringValueLen = 9;
+		paddedStrLen = 16;
+	}
+	SECTION("Even multiple string length") {
+		// String *is* a multiple of 8 bytes
+		// So it does not need to be padded
+		expectedStringValue = "abcdefghijklmnopqrstuvwx";
+		stringValueLen = 24;
+		paddedStrLen = 24;
+	}
+
+	uint16_t strIndex;
+	REQUIRE(fxt::GetOrCreateStringIndex(&writer, expectedStringValue, &strIndex) == 0);
+
+	// The record should be the header (8 bytes) plus the padded string
+	uint64_t expectedRecordSizeInWords = 1 + (paddedStrLen / 8);
+	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
+
+	// Validate the header fields
+	uint64_t header = ReadUInt64(&buffer[0]);
+	INFO("Header: " << std::showbase << std::hex << header);
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::String);
+	// Record size in multiples of uint64_t
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedRecordSizeInWords);
+	// String index
+	REQUIRE(GetFieldFromValue(16, 30, header) == strIndex);
+	// Check padding bit
+	REQUIRE(GetFieldFromValue(31, 31, header) == 0);
+	// String length
+	uint64_t actualStringLen = GetFieldFromValue(32, 46, header);
+	REQUIRE(actualStringLen == stringValueLen);
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(47, 63, header) == 0);
+
+	// Check the string
+	std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + stringValueLen));
+	REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(expectedStringValue));
+
+	// Check that the remaining bytes are all zero
+	std::vector<uint8_t> expectedZeros(paddedStrLen - stringValueLen, 0);
+	std::vector<uint8_t> actualBytes(buffer.begin() + (8 + stringValueLen), buffer.end());
+	REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+}
+
+TEST_CASE("TestThreadRecord", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	const fxt::KernelObjectID processID = 254895426;
+	const fxt::KernelObjectID threadID = 5743738;
+
+	uint16_t threadIndex;
+	REQUIRE(fxt::GetOrCreateThreadIndex(&writer, processID, threadID, &threadIndex) == 0);
+
+	// The record should be the header (8 bytes) plus two uint64 (16 bytes)
+	uint64_t expectedRecordSizeInWords = 3;
+	REQUIRE(buffer.size() == expectedRecordSizeInWords * 8);
+
+	// Validate the header fields
+	uint64_t header = ReadUInt64(&buffer[0]);
+	INFO("Header: " << std::showbase << std::hex << header);
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::Thread);
+	// Record size in multiples of uint64_t
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedRecordSizeInWords);
+	// Thread index
+	REQUIRE(GetFieldFromValue(16, 23, header) == threadIndex);
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(24, 63, header) == 0);
+
+	uint64_t actualProcessID = ReadUInt64(&buffer[8]);
+	REQUIRE(actualProcessID == processID);
+
+	uint64_t actualThreadID = ReadUInt64(&buffer[16]);
+	REQUIRE(actualThreadID == threadID);
+}
+
+TEST_CASE("TestArguments", "[write]") {
+	std::vector<uint8_t> buffer;
+
+	fxt::Writer writer((void *)&buffer, [](void *userContext, const void *data, size_t len) -> int {
+		std::vector<uint8_t> *buffer = (std::vector<uint8_t> *)userContext;
+
+		buffer->insert(buffer->end(), (const uint8_t *)data, (const uint8_t *)data + len);
+		return 0;
+	});
+
+	SECTION("Inline name") {
+		const char *argumentName = "myArgumentName";
+		const uint64_t argumentNameLen = 14;
+		const uint64_t argumentNamePaddedLen = 16;
+		// The string ref has the high bit set to signal it's an inline string
+		const uint16_t expectedNameStrRef = 0x8000 | argumentNameLen;
+
+		SECTION("Null") {
+			// The argument should just be the header (8 bytes) and the padded name (16 bytes)
+			uint64_t expectedArgSizeInWords = 3;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(nullptr));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Null arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Null);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// The rest should be zero
+			REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining bytes are all zero
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + (8 + argumentNameLen), buffer.end());
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+		}
+		SECTION("Int32") {
+			// The argument should just be the header (8 bytes) and the padded name (16 bytes)
+			uint64_t expectedArgSizeInWords = 3;
+			int32_t expectedValue = 3456871;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int32 arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Int32);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// Value
+			REQUIRE((int32_t)GetFieldFromValue(32, 63, header) == expectedValue);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining bytes are all zero
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + (8 + argumentNameLen), buffer.end());
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+		}
+		SECTION("UInt32") {
+			// The argument should just be the header (8 bytes) and the padded name (16 bytes)
+			uint64_t expectedArgSizeInWords = 3;
+			uint32_t expectedValue = 845914856;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// UInt32 arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::UInt32);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// Value
+			REQUIRE((int32_t)GetFieldFromValue(32, 63, header) == expectedValue);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining bytes are all zero
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + (8 + argumentNameLen), buffer.end());
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+		}
+		SECTION("Int64") {
+			// The argument should be the header (8 bytes), the padded name (16 bytes), and the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 4;
+			int64_t expectedValue = 849418487798494;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int64 arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Int64);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// The rest should be zero
+			REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining padding bytes are all zero
+			size_t argNameEnd = 8 /* header */ + argumentNamePaddedLen;
+
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + 8 + argumentNameLen, buffer.begin() + argNameEnd);
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+
+			// Read the value
+			int64_t value = (int64_t)ReadUInt64(&buffer[argNameEnd]);
+			REQUIRE(value == expectedValue);
+		}
+		SECTION("UInt64") {
+			// The argument should be the header (8 bytes), the padded name (16 bytes), and the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 4;
+			uint64_t expectedValue = 2098732459873498723;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int64 arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::UInt64);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// The rest should be zero
+			REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining padding bytes are all zero
+			size_t argNameEnd = 8 /* header */ + argumentNamePaddedLen;
+
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + 8 + argumentNameLen, buffer.begin() + argNameEnd);
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+
+			// Read the value
+			uint64_t value = ReadUInt64(&buffer[argNameEnd]);
+			REQUIRE(value == expectedValue);
+		}
+		SECTION("Double") {
+			// The argument should be the header (8 bytes), the padded name (16 bytes), and the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 4;
+			double expectedValue = 37728.564373821234;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int64 arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Double);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// The rest should be zero
+			REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining padding bytes are all zero
+			size_t argNameEnd = 8 /* header */ + argumentNamePaddedLen;
+
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + 8 + argumentNameLen, buffer.begin() + argNameEnd);
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+
+			// Read the value
+			uint64_t rawValue = ReadUInt64(&buffer[argNameEnd]);
+			double value = *reinterpret_cast<double *>(&rawValue);
+			REQUIRE(value == expectedValue);
+		}
+		SECTION("String") {
+			const char *argumentValue = "myArgValue";
+			const uint64_t argumentValueLen = 10;
+			const uint64_t argumentValuePaddedLen = 16;
+
+			SECTION("Inline value") {
+				// The string ref has the high bit set to signal it's an inline string
+				const uint16_t expectedValueStrRef = 0x8000 | argumentValueLen;
+				const bool useStrTableForValue = false;
+
+				// The argument should be the header (8 bytes), the padded name (16 bytes), and the padded value (16)
+				uint64_t expectedArgSizeInWords = 5;
+
+				fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(argumentValue, useStrTableForValue));
+
+				fxt::ProcessedRecordArgument processedArg;
+				REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+				// Validate the processing
+
+				// We're using an inline name string
+				REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+				// Name str ref
+				REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+				// We're using an inline value string
+				REQUIRE(processedArg.valueSizeInWords == argumentValuePaddedLen / 8);
+				// Value str ref
+				REQUIRE(processedArg.valueStringRef == expectedValueStrRef);
+
+				// Write the argument
+				unsigned int wordsWritten;
+				REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+				REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+				// Validate the written bytes
+				REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+				uint64_t bufferOffset = 0;
+
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::String);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// Arg value string ref
+				REQUIRE((uint16_t)GetFieldFromValue(32, 47, header) == expectedValueStrRef);
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(48, 63, header) == 0);
+
+				// Check the name string
+				std::string actualNameStringValue(buffer.begin() + bufferOffset, buffer.begin() + bufferOffset + argumentNameLen);
+				REQUIRE_THAT(actualNameStringValue, Catch::Matchers::Equals(argumentName));
+
+				// Check that the remaining padding bytes are all zero
+				{
+					std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+					std::vector<uint8_t> actualBytes(buffer.begin() + bufferOffset + argumentNameLen, buffer.begin() + bufferOffset + argumentNamePaddedLen);
+					REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+				}
+				bufferOffset += argumentNamePaddedLen;
+
+				// Check the value string
+				std::string actualValueStringValue(buffer.begin() + bufferOffset, buffer.begin() + bufferOffset + argumentValueLen);
+				REQUIRE_THAT(actualValueStringValue, Catch::Matchers::Equals(argumentValue));
+
+				// Check that the remaining padding bytes are all zero
+				{
+					std::vector<uint8_t> expectedZeros(argumentValuePaddedLen - argumentValueLen, 0);
+					std::vector<uint8_t> actualBytes(buffer.begin() + bufferOffset + argumentValueLen, buffer.begin() + bufferOffset + argumentValuePaddedLen);
+					REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+				}
+				bufferOffset += argumentValuePaddedLen;
+
+				// Check that we read everything
+				REQUIRE(bufferOffset == buffer.size());
+			}
+			SECTION("String table value") {
+				// Index 1 in the table (we start from 1. Zero is a special value)
+				const uint16_t expectedValueStrRef = 1;
+				const bool useStrTableForValue = true;
+
+				// The argument should be the header (8 bytes) and the padded name (16 bytes)
+				uint64_t expectedArgSizeInWords = 3;
+
+				fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(argumentValue, useStrTableForValue));
+
+				fxt::ProcessedRecordArgument processedArg;
+				REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+				// Validate the processing
+
+				// We're using an inline name string
+				REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+				// Name str ref
+				REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+				// We're using string table value
+				REQUIRE(processedArg.valueSizeInWords == 0);
+				// Value str ref
+				REQUIRE(processedArg.valueStringRef == expectedValueStrRef);
+
+				// Write the argument
+				unsigned int wordsWritten;
+				REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+				REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+				// Validate the written bytes
+				size_t bufferOffset = 0;
+
+				// We write a string table record before the argument data,
+				// which is the header (8 bytes) and the padded value (16 bytes)
+				uint64_t expectedStringRecordSizeInWords = 3;
+				REQUIRE(buffer.size() == (expectedStringRecordSizeInWords + expectedArgSizeInWords) * 8);
+
+				// Validate the string table record
+				bufferOffset += ValidateStringTableRecord(&buffer[0], argumentValue, expectedValueStrRef);
+
+				// Validate the argument record
+				{
+					// Validate the header fields
+					uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+					INFO("Header: " << std::showbase << std::hex << header);
+					bufferOffset += 8;
+
+					// Arg type
+					REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::String);
+					// Arg size in multiples of uint64_t
+					REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+					// Arg name string ref
+					REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+					// Arg value string ref
+					REQUIRE((uint16_t)GetFieldFromValue(32, 47, header) == expectedValueStrRef);
+					// The rest should be zero
+					REQUIRE(GetFieldFromValue(48, 63, header) == 0);
+
+					// Check the name string
+					std::string actualNameStringValue(buffer.begin() + bufferOffset, buffer.begin() + bufferOffset + argumentNameLen);
+					REQUIRE_THAT(actualNameStringValue, Catch::Matchers::Equals(argumentName));
+
+					std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+					std::vector<uint8_t> actualBytes(buffer.begin() + bufferOffset + argumentNameLen, buffer.begin() + bufferOffset + argumentNamePaddedLen);
+					REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+
+					bufferOffset += argumentNamePaddedLen;
+				}
+
+				// Check that we read everything
+				REQUIRE(bufferOffset == buffer.size());
+			}
+		}
+		SECTION("Pointer") {
+			// The argument should be the header (8 bytes), the padded name (16 bytes), and the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 4;
+			int *expectedValue = (int *)0x5673738495;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int64 arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Pointer);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// The rest should be zero
+			REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining padding bytes are all zero
+			size_t argNameEnd = 8 /* header */ + argumentNamePaddedLen;
+
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + 8 + argumentNameLen, buffer.begin() + argNameEnd);
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+
+			// Read the value
+			int *value = (int *)ReadUInt64(&buffer[argNameEnd]);
+			REQUIRE(value == expectedValue);
+		}
+		SECTION("KOID") {
+			// The argument should be the header (8 bytes), the padded name (16 bytes), and the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 4;
+			fxt::KernelObjectID expectedValue = 8498156988;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue::KOID(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int64 arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::KOID);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// The rest should be zero
+			REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining padding bytes are all zero
+			size_t argNameEnd = 8 /* header */ + argumentNamePaddedLen;
+
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + 8 + argumentNameLen, buffer.begin() + argNameEnd);
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+
+			// Read the value
+			fxt::KernelObjectID value = (fxt::KernelObjectID)ReadUInt64(&buffer[argNameEnd]);
+			REQUIRE(value == expectedValue);
+		}
+		SECTION("Bool") {
+			// The argument should just be the header (8 bytes) and the padded name (16 bytes)
+			uint64_t expectedArgSizeInWords = 3;
+			bool expectedValue = true;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentName, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using an inline name string
+			REQUIRE(processedArg.nameSizeInWords == argumentNamePaddedLen / 8);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Bool arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			REQUIRE(buffer.size() == expectedArgSizeInWords * 8);
+
+			// Validate the header fields
+			uint64_t header = ReadUInt64(&buffer[0]);
+			INFO("Header: " << std::showbase << std::hex << header);
+
+			// Arg type
+			REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Bool);
+			// Arg size in multiples of uint64_t
+			REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+			// Arg name string ref
+			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+			// Bool value is stored in a single bit
+			REQUIRE((uint8_t)GetFieldFromValue(32, 32, header) == (expectedValue ? 1 : 0));
+			// The rest should be zero
+			REQUIRE(GetFieldFromValue(33, 63, header) == 0);
+
+			// Check the name string
+			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
+			REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(argumentName));
+
+			// Check that the remaining bytes are all zero
+			std::vector<uint8_t> expectedZeros(argumentNamePaddedLen - argumentNameLen, 0);
+			std::vector<uint8_t> actualBytes(buffer.begin() + (8 + argumentNameLen), buffer.end());
+			REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+		}
+	}
+	SECTION("String table name") {
+		const char *argumentName = "myArgumentName";
+		const uint64_t argumentNameLen = 14;
+		const uint64_t argumentNamePaddedLen = 16;
+		// This will be the first string record (index 0 is a special value)
+		const uint16_t expectedNameStrRef = 1;
+		const bool useStrTableForName = true;
+		const fxt::RecordArgumentName argumentNameValue = fxt::RecordArgumentName(argumentName, useStrTableForName);
+
+		SECTION("Null") {
+			// The argument should just be the header (8 bytes)
+			uint64_t expectedArgSizeInWords = 1;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(nullptr));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Null arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Null);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("Int32") {
+			// The argument should just be the header (8 bytes)
+			uint64_t expectedArgSizeInWords = 1;
+			int32_t expectedValue = 4373738;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int32 arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Int32);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// Check the value
+				REQUIRE((int32_t)GetFieldFromValue(32, 63, header) == expectedValue);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("UInt32") {
+			// The argument should just be the header (8 bytes)
+			uint64_t expectedArgSizeInWords = 1;
+			uint32_t expectedValue = 97949649;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// UInt32 arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::UInt32);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// Check the value
+				REQUIRE((int32_t)GetFieldFromValue(32, 63, header) == expectedValue);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("Int64") {
+			// The argument should just be the header (8 bytes) plus the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 2;
+			int64_t expectedValue = 8978449955885;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Int64 arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Int64);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+				// Read the value
+				int64_t value = (int64_t)ReadUInt64(&buffer[bufferOffset]);
+				bufferOffset += 8;
+				REQUIRE(value == expectedValue);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("UInt64") {
+			// The argument should just be the header (8 bytes) plus the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 2;
+			uint64_t expectedValue = 291849871298733;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// UInt64 arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::UInt64);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+				// Read the value
+				uint64_t value = (uint64_t)ReadUInt64(&buffer[bufferOffset]);
+				bufferOffset += 8;
+				REQUIRE(value == expectedValue);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("Double") {
+			// The argument should just be the header (8 bytes) plus the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 2;
+			double expectedValue = 84152.5489512;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Double arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Double);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+				// Read the value
+				uint64_t rawValue = ReadUInt64(&buffer[bufferOffset]);
+				bufferOffset += 8;
+				double value = *reinterpret_cast<double *>(&rawValue);
+				REQUIRE(value == expectedValue);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("String") {
+			const char *argumentValue = "myArgValue";
+			const uint64_t argumentValueLen = 10;
+			const uint64_t argumentValuePaddedLen = 16;
+
+			SECTION("Inline value") {
+				// The string ref has the high bit set to signal it's an inline string
+				const uint16_t expectedValueStrRef = 0x8000 | argumentValueLen;
+				const bool useStrTableForValue = false;
+
+				// The argument should just be the header (8 bytes) plus the padded value (16 bytes)
+				uint64_t expectedArgSizeInWords = 3;
+
+				fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(argumentValue, useStrTableForValue));
+
+				fxt::ProcessedRecordArgument processedArg;
+				REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+				// Validate the processing
+
+				// We're using a string table name. So this is zero
+				REQUIRE(processedArg.nameSizeInWords == 0);
+				// Name str ref
+				REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+				// We're using an inline value string
+				REQUIRE(processedArg.valueSizeInWords == argumentValuePaddedLen / 8);
+				// Value str ref
+				REQUIRE(processedArg.valueStringRef == expectedValueStrRef);
+
+				// Write the argument
+				unsigned int wordsWritten;
+				REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+				REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+				// Validate the written bytes
+				uint64_t bufferOffset = 0;
+
+				// The name string record is first
+				bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+				// Now we can validate the argument data itself
+				{
+					// Validate the header fields
+					uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+					INFO("Header: " << std::showbase << std::hex << header);
+					bufferOffset += 8;
+
+					// Arg type
+					REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::String);
+					// Arg size in multiples of uint64_t
+					REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+					// Arg name string ref
+					REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+					// Arg value string ref
+					REQUIRE((uint16_t)GetFieldFromValue(32, 47, header) == expectedValueStrRef);
+					// The rest should be zero
+					REQUIRE(GetFieldFromValue(48, 63, header) == 0);
+
+					// Check the value string
+					std::string actualValueStringValue(buffer.begin() + bufferOffset, buffer.begin() + bufferOffset + argumentValueLen);
+					REQUIRE_THAT(actualValueStringValue, Catch::Matchers::Equals(argumentValue));
+
+					// Check that the remaining padding bytes are all zero
+					{
+						std::vector<uint8_t> expectedZeros(argumentValuePaddedLen - argumentValueLen, 0);
+						std::vector<uint8_t> actualBytes(buffer.begin() + bufferOffset + argumentValueLen, buffer.begin() + bufferOffset + argumentValuePaddedLen);
+						REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+					}
+					bufferOffset += argumentValuePaddedLen;
+				}
+
+				// Check that we read everything
+				REQUIRE(bufferOffset == buffer.size());
+			}
+			SECTION("String table value") {
+				// Index 2 in the table. The name string is index 1
+				const uint16_t expectedValueStrRef = 2;
+				const bool useStrTableForValue = true;
+
+				// The argument should just be the header (8 bytes)
+				uint64_t expectedArgSizeInWords = 1;
+
+				fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(argumentValue, useStrTableForValue));
+
+				fxt::ProcessedRecordArgument processedArg;
+				REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+				// Validate the processing
+
+				// We're using a string table name. So this is zero
+				REQUIRE(processedArg.nameSizeInWords == 0);
+				// Name str ref
+				REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+				// We're using a string table value. So this is zero
+				REQUIRE(processedArg.valueSizeInWords == 0);
+				// Value str ref
+				REQUIRE(processedArg.valueStringRef == expectedValueStrRef);
+
+				// Write the argument
+				unsigned int wordsWritten;
+				REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+				REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+				// Validate the written bytes
+				uint64_t bufferOffset = 0;
+
+				// The name string record is first
+				bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+				// Then the value string record
+				bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentValue, expectedValueStrRef);
+
+				// Now we can validate the argument data itself
+				{
+					// Validate the header fields
+					uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+					INFO("Header: " << std::showbase << std::hex << header);
+					bufferOffset += 8;
+
+					// Arg type
+					REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::String);
+					// Arg size in multiples of uint64_t
+					REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+					// Arg name string ref
+					REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+					// Arg value string ref
+					REQUIRE((uint16_t)GetFieldFromValue(32, 47, header) == expectedValueStrRef);
+					// The rest should be zero
+					REQUIRE(GetFieldFromValue(48, 63, header) == 0);
+				}
+
+				// Check that we read everything
+				REQUIRE(bufferOffset == buffer.size());
+			}
+		}
+		SECTION("Pointer") {
+			// The argument should just be the header (8 bytes) plus the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 2;
+			int *expectedValue = (int *)0x35457373;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Pointer arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Pointer);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+				// Read the value
+				int *value = (int *)ReadUInt64(&buffer[bufferOffset]);
+				bufferOffset += 8;
+				REQUIRE(value == expectedValue);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("KOID") {
+			// The argument should just be the header (8 bytes) plus the value (8 bytes)
+			uint64_t expectedArgSizeInWords = 2;
+			fxt::KernelObjectID expectedValue = 8383929394;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue::KOID(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// KOID arg takes 1 word
+			REQUIRE(processedArg.valueSizeInWords == 1);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::KOID);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(32, 63, header) == 0);
+
+				// Read the value
+				fxt::KernelObjectID value = (fxt::KernelObjectID)ReadUInt64(&buffer[bufferOffset]);
+				bufferOffset += 8;
+				REQUIRE(value == expectedValue);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+		SECTION("Bool") {
+			// The argument should just be the header (8 bytes)
+			uint64_t expectedArgSizeInWords = 1;
+			bool expectedValue = true;
+
+			fxt::RecordArgument arg = fxt::RecordArgument(argumentNameValue, fxt::RecordArgumentValue(expectedValue));
+
+			fxt::ProcessedRecordArgument processedArg;
+			REQUIRE(fxt::ProcessArgs(&writer, &arg, 1, &processedArg) == 0);
+
+			// Validate the processing
+
+			// We're using a string table name. So this is zero
+			REQUIRE(processedArg.nameSizeInWords == 0);
+			// Name str ref
+			REQUIRE(processedArg.nameStringRef == expectedNameStrRef);
+			// Bool arg doesn't take up any extra space
+			REQUIRE(processedArg.valueSizeInWords == 0);
+
+			// Write the argument
+			unsigned int wordsWritten;
+			REQUIRE(fxt::WriteArg(&writer, &arg, &processedArg, &wordsWritten) == 0);
+			REQUIRE(wordsWritten == expectedArgSizeInWords);
+
+			// Validate the written bytes
+			uint64_t bufferOffset = 0;
+
+			// The name string record is first
+			bufferOffset += ValidateStringTableRecord(&buffer[bufferOffset], argumentName, expectedNameStrRef);
+
+			// Now we can validate the argument data itself
+			{
+				// Validate the header fields
+				uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+				INFO("Header: " << std::showbase << std::hex << header);
+				bufferOffset += 8;
+
+				// Arg type
+				REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::internal::ArgumentType::Bool);
+				// Arg size in multiples of uint64_t
+				REQUIRE(GetFieldFromValue(4, 15, header) == expectedArgSizeInWords);
+				// Arg name string ref
+				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
+				// Check the value
+				REQUIRE((uint8_t)GetFieldFromValue(32, 32, header) == (expectedValue ? 1 : 0));
+				// The rest should be zero
+				REQUIRE(GetFieldFromValue(33, 63, header) == 0);
+			}
+
+			// Check that we read everything
+			REQUIRE(bufferOffset == buffer.size());
+		}
+	}
+}
+
+static uint64_t ValidateStringTableRecord(uint8_t *buffer, const char *expectedValue, uint16_t expectedValueStrRef) {
+	uint64_t bufferOffset = 0;
+
+	uint16_t expectedStrLen = strlen(expectedValue);
+	uint16_t expectedPaddedStrLen = (expectedStrLen + 8 - 1) & (-8);
+	uint16_t expectedStringRecordSizeInWords = 1 /* header */ + (expectedPaddedStrLen / 8);
+
+	// Validate the header fields
+	uint64_t header = ReadUInt64(&buffer[bufferOffset]);
+	INFO("Header: " << std::showbase << std::hex << header);
+	bufferOffset += 8;
+
+	// Record type
+	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::String);
+	// Record size in multiples of uint64_t
+	REQUIRE((uint16_t)GetFieldFromValue(4, 15, header) == expectedStringRecordSizeInWords);
+	// String index
+	REQUIRE((uint16_t)GetFieldFromValue(16, 30, header) == expectedValueStrRef);
+	// Check padding bit
+	REQUIRE(GetFieldFromValue(31, 31, header) == 0);
+	// String length
+	uint64_t actualStringLen = GetFieldFromValue(32, 46, header);
+	REQUIRE(actualStringLen == expectedStrLen);
+	// The rest should be zero
+	REQUIRE(GetFieldFromValue(47, 63, header) == 0);
+
+	// Check the string
+	std::string actualStringValue(buffer + bufferOffset, buffer + bufferOffset + expectedStrLen);
+	REQUIRE_THAT(actualStringValue, Catch::Matchers::Equals(expectedValue));
+
+	// Check that the remaining bytes are all zero
+	std::vector<uint8_t> expectedZeros(expectedPaddedStrLen - expectedStrLen, 0);
+	std::vector<uint8_t> actualBytes(buffer + bufferOffset + expectedStrLen, buffer + bufferOffset + expectedPaddedStrLen);
+	REQUIRE_THAT(actualBytes, Catch::Matchers::Equals(expectedZeros));
+
+	bufferOffset += expectedPaddedStrLen;
+
+	return bufferOffset;
 }

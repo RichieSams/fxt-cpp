@@ -293,22 +293,22 @@ int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, Proc
 		// Then we process the value
 		switch (args[i].value.type) {
 		case internal::ArgumentType::Null:
-			processedArgs[i].headerAndValueSizeInWords = 1;
+			processedArgs[i].valueSizeInWords = 0;
 			break;
 		case internal::ArgumentType::Int32:
-			processedArgs[i].headerAndValueSizeInWords = 1;
+			processedArgs[i].valueSizeInWords = 0;
 			break;
 		case internal::ArgumentType::UInt32:
-			processedArgs[i].headerAndValueSizeInWords = 1;
+			processedArgs[i].valueSizeInWords = 0;
 			break;
 		case internal::ArgumentType::Int64:
-			processedArgs[i].headerAndValueSizeInWords = 2;
+			processedArgs[i].valueSizeInWords = 1;
 			break;
 		case internal::ArgumentType::UInt64:
-			processedArgs[i].headerAndValueSizeInWords = 2;
+			processedArgs[i].valueSizeInWords = 1;
 			break;
 		case internal::ArgumentType::Double:
-			processedArgs[i].headerAndValueSizeInWords = 2;
+			processedArgs[i].valueSizeInWords = 1;
 			break;
 		case internal::ArgumentType::String: {
 			if (args[i].value.hexEncode) {
@@ -321,14 +321,14 @@ int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, Proc
 
 				processedArgs[i].valueStringRef = StringRefFields::Inline(encodedLen);
 				const size_t paddedValueStrLen = (encodedLen + 8 - 1) & (-8);
-				processedArgs[i].headerAndValueSizeInWords = 1 + paddedValueStrLen / 8;
+				processedArgs[i].valueSizeInWords = paddedValueStrLen / 8;
 			} else {
 				if (args[i].value.useStringTable) {
 					int ret = GetOrCreateStringIndex(writer, args[i].value.stringValue, args[i].value.stringLen, &processedArgs[i].valueStringRef);
 					if (ret != 0) {
 						return ret;
 					}
-					processedArgs[i].headerAndValueSizeInWords = 1;
+					processedArgs[i].valueSizeInWords = 0;
 				} else {
 					if (args[i].value.stringLen > StringRefFields::MaxInlineStrLen) {
 						return FXT_ERR_ARG_STR_VALUE_TOO_LONG;
@@ -336,20 +336,20 @@ int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, Proc
 
 					processedArgs[i].valueStringRef = StringRefFields::Inline(args[i].value.stringLen);
 					const size_t paddedValueStrLen = (args[i].value.stringLen + 8 - 1) & (-8);
-					processedArgs[i].headerAndValueSizeInWords = 1 + paddedValueStrLen / 8;
+					processedArgs[i].valueSizeInWords = paddedValueStrLen / 8;
 				}
 			}
 
 			break;
 		}
 		case internal::ArgumentType::Pointer:
-			processedArgs[i].headerAndValueSizeInWords = 2;
+			processedArgs[i].valueSizeInWords = 1;
 			break;
 		case internal::ArgumentType::KOID:
-			processedArgs[i].headerAndValueSizeInWords = 2;
+			processedArgs[i].valueSizeInWords = 1;
 			break;
 		case internal::ArgumentType::Bool:
-			processedArgs[i].headerAndValueSizeInWords = 1;
+			processedArgs[i].valueSizeInWords = 0;
 			break;
 		}
 	}
@@ -360,7 +360,7 @@ int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, Proc
 int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument *processedArg, unsigned *wordsWritten) {
 	switch (arg->value.type) {
 	case internal::ArgumentType::Null: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        ArgumentFields::NameRef::Make(processedArg->nameStringRef);
@@ -388,7 +388,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::Int32: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = Int32ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        Int32ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        Int32ArgumentFields::NameRef::Make(processedArg->nameStringRef) |
@@ -417,7 +417,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::UInt32: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = UInt32ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        UInt32ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        UInt32ArgumentFields::NameRef::Make(processedArg->nameStringRef) |
@@ -446,7 +446,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::Int64: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        ArgumentFields::NameRef::Make(processedArg->nameStringRef);
@@ -479,7 +479,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::UInt64: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        ArgumentFields::NameRef::Make(processedArg->nameStringRef);
@@ -512,7 +512,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::Double: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        ArgumentFields::NameRef::Make(processedArg->nameStringRef);
@@ -545,7 +545,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::String: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = StringArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        StringArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        StringArgumentFields::NameRef::Make(processedArg->nameStringRef) |
@@ -571,58 +571,61 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		}
 
 		// Write the value string if we're using inline strings
-		if (arg->value.hexEncode) {
-			static const char hexChars[] = "0123456789abcdef";
+		if (!arg->value.useStringTable) {
+			if (arg->value.hexEncode) {
+				static const char hexChars[] = "0123456789abcdef";
 
-			size_t encodedLen = arg->value.stringLen * 2;
-			size_t diff = (processedArg->headerAndValueSizeInWords - 1) * 8 - encodedLen;
+				size_t encodedLen = arg->value.stringLen * 2;
+				size_t diff = (processedArg->valueSizeInWords - 1) * 8 - encodedLen;
 
-			char buffer[256];
-			static_assert(sizeof(buffer) % 2 == 0, "buffer must be an even size, so we can guarantee we have space for both chars per byte");
-			size_t offset = 0;
-			size_t writtenBytes = 0;
+				char buffer[256];
+				static_assert(sizeof(buffer) % 2 == 0, "buffer must be an even size, so we can guarantee we have space for both chars per byte");
+				size_t offset = 0;
+				size_t writtenBytes = 0;
 
-			// Start encoding in blocks
-			for (size_t i = 0; i < arg->value.stringLen; ++i) {
-				if (offset > sizeof(buffer)) {
-					ret = WriteBytesToStream(writer, buffer, sizeof(buffer));
+				// Start encoding in blocks
+				for (size_t i = 0; i < arg->value.stringLen; ++i) {
+					if (offset > sizeof(buffer)) {
+						ret = WriteBytesToStream(writer, buffer, sizeof(buffer));
+						if (ret != 0) {
+							return ret;
+						}
+
+						offset = 0;
+					}
+
+					buffer[offset] = hexChars[(arg->value.stringValue[i] >> 4) & 0x0F];
+					buffer[offset + 1] = hexChars[(arg->value.stringValue[i]) & 0x0F];
+
+					offset += 2;
+				}
+
+				// Flush any remaining bytes
+				if (offset > 0) {
+					ret = WriteBytesToStream(writer, buffer, offset);
 					if (ret != 0) {
 						return ret;
 					}
-
-					offset = 0;
 				}
 
-				buffer[offset] = hexChars[(arg->value.stringValue[i] >> 4) & 0x0F];
-				buffer[offset + 1] = hexChars[(arg->value.stringValue[i]) & 0x0F];
+				if (diff > 0) {
+					ret = WriteZeroPadding(writer, diff);
+					if (ret != 0) {
+						return ret;
+					}
+				}
+			} else {
+				unsigned diff = processedArg->valueSizeInWords * 8 - arg->value.stringLen;
 
-				offset += 2;
-			}
-
-			// Flush any remaining bytes
-			if (offset > 0) {
-				ret = WriteBytesToStream(writer, buffer, offset);
+				ret = WriteBytesToStream(writer, arg->value.stringValue, arg->value.stringLen);
 				if (ret != 0) {
 					return ret;
 				}
-			}
-
-			if (diff > 0) {
-				ret = WriteZeroPadding(writer, diff);
-				if (ret != 0) {
-					return ret;
-				}
-			}
-		} else if (!arg->value.useStringTable) {
-			size_t diff = (processedArg->headerAndValueSizeInWords - 1) * 8 - arg->value.stringLen;
-			ret = WriteBytesToStream(writer, arg->value.stringValue, arg->value.stringLen);
-			if (ret != 0) {
-				return ret;
-			}
-			if (diff > 0) {
-				ret = WriteZeroPadding(writer, diff);
-				if (ret != 0) {
-					return ret;
+				if (diff > 0) {
+					ret = WriteZeroPadding(writer, diff);
+					if (ret != 0) {
+						return ret;
+					}
 				}
 			}
 		}
@@ -631,7 +634,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::Pointer: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        ArgumentFields::NameRef::Make(processedArg->nameStringRef);
@@ -664,7 +667,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::KOID: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = ArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        ArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        ArgumentFields::NameRef::Make(processedArg->nameStringRef);
@@ -697,7 +700,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 		return 0;
 	}
 	case internal::ArgumentType::Bool: {
-		const unsigned sizeInWords = processedArg->nameSizeInWords + processedArg->headerAndValueSizeInWords;
+		const unsigned sizeInWords = 1 + processedArg->nameSizeInWords + processedArg->valueSizeInWords;
 		const uint64_t header = BoolArgumentFields::Type::Make(ToUnderlyingType(arg->value.type)) |
 		                        BoolArgumentFields::ArgumentSize::Make(sizeInWords) |
 		                        BoolArgumentFields::NameRef::Make(processedArg->nameStringRef) |
@@ -778,7 +781,7 @@ int SetThreadName(Writer *writer, KernelObjectID processID, KernelObjectID threa
 		return ret;
 	}
 
-	const unsigned argSizeInWords = processedProcessArg.nameSizeInWords + processedProcessArg.headerAndValueSizeInWords;
+	const unsigned argSizeInWords = /* header */ 1 + processedProcessArg.nameSizeInWords + processedProcessArg.valueSizeInWords;
 	const uint64_t sizeInWords = /* header */ 1 + /* threadID */ 1 + /* argument data */ argSizeInWords;
 	if (sizeInWords > KernelObjectRecordFields::kMaxRecordSizeWords) {
 		return FXT_ERR_RECORD_SIZE_TOO_LARGE;
@@ -845,7 +848,7 @@ static int WriteEventHeaderAndGenericData(Writer *writer, EventType eventType, c
 	// Add up the argument word size
 	unsigned argumentSizeInWords = 0;
 	for (size_t i = 0; i < numArgs; ++i) {
-		argumentSizeInWords += processedArgs[i].nameSizeInWords + processedArgs[i].headerAndValueSizeInWords;
+		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* argument data */ argumentSizeInWords + /* extra stuff */ extraSizeInWords;
@@ -1178,7 +1181,7 @@ int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID pr
 	// Add up the argument word size
 	unsigned argumentSizeInWords = 0;
 	for (size_t i = 0; i < numArgs; ++i) {
-		argumentSizeInWords += processedArgs[i].nameSizeInWords + processedArgs[i].headerAndValueSizeInWords;
+		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* pointer value */ 1 + /* argument data */ argumentSizeInWords;
@@ -1242,7 +1245,7 @@ int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingT
 	// Add up the argument word size
 	unsigned argumentSizeInWords = 0;
 	for (size_t i = 0; i < numArgs; ++i) {
-		argumentSizeInWords += processedArgs[i].nameSizeInWords + processedArgs[i].headerAndValueSizeInWords;
+		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing thread ID */ 1 + /* incoming thread ID */ 1 + /* argument data */ argumentSizeInWords;
@@ -1311,7 +1314,7 @@ int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectI
 	// Add up the argument word size
 	unsigned argumentSizeInWords = 0;
 	for (size_t i = 0; i < numArgs; ++i) {
-		argumentSizeInWords += processedArgs[i].nameSizeInWords + processedArgs[i].headerAndValueSizeInWords;
+		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing fiber ID */ 1 + /* incoming fiber ID */ 1 + /* argument data */ argumentSizeInWords;
@@ -1378,7 +1381,7 @@ int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wak
 	// Add up the argument word size
 	unsigned argumentSizeInWords = 0;
 	for (size_t i = 0; i < numArgs; ++i) {
-		argumentSizeInWords += processedArgs[i].nameSizeInWords + processedArgs[i].headerAndValueSizeInWords;
+		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
 	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* waking thread ID */ 1 + /* argument data */ argumentSizeInWords;

@@ -107,7 +107,8 @@
         "cinttypes": "cpp",
         "xlocmon": "cpp",
         "xtr1common": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "any": "cpp"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }

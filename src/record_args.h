@@ -17,7 +17,7 @@ struct ProcessedRecordArgument {
 	uint16_t nameSizeInWords;
 
 	uint16_t valueStringRef;
-	uint16_t headerAndValueSizeInWords;
+	uint16_t valueSizeInWords;
 };
 
 } // End of namespace fxt
