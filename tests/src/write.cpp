@@ -99,6 +99,10 @@ TEST_CASE("TestUsingSameStringReturnsSameIndex", "[write]") {
 	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
 		// Just drop the data
 		// We don't need it for this test
+		(void)userContext;
+		(void)data;
+		(void)len;
+
 		return 0;
 	});
 
@@ -123,6 +127,10 @@ TEST_CASE("TestUsingSameThreadReturnsSameIndex", "[write]") {
 	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
 		// Just drop the data
 		// We don't need it for this test
+		(void)userContext;
+		(void)data;
+		(void)len;
+
 		return 0;
 	});
 
@@ -153,11 +161,15 @@ TEST_CASE("TestOverflowingStringTableWraps", "[write]") {
 	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
 		// Just drop the data
 		// We don't need it for this test
+		(void)userContext;
+		(void)data;
+		(void)len;
+
 		return 0;
 	});
 
 	char buffer[128];
-	uint16_t strIndex;
+	uint16_t strIndex = 0;
 	for (int i = 0; i < 512; ++i) {
 		// Generate a unique string for each round. So we get a new index
 		REQUIRE((size_t)snprintf(buffer, sizeof(buffer), "str-%d", i) < sizeof(buffer));
@@ -178,10 +190,14 @@ TEST_CASE("TestOverflowingThreadTableWraps", "[write]") {
 	fxt::Writer writer(nullptr, [](void *userContext, const void *data, size_t len) -> int {
 		// Just drop the data
 		// We don't need it for this test
+		(void)userContext;
+		(void)data;
+		(void)len;
+
 		return 0;
 	});
 
-	uint16_t threadIndex;
+	uint16_t threadIndex = 0;
 	for (int i = 0; i < 128; ++i) {
 		REQUIRE(GetOrCreateThreadIndex(&writer, 1, i, &threadIndex) == 0);
 		// Zero is a reserved index
@@ -392,9 +408,9 @@ TEST_CASE("TestStringRecord", "[write]") {
 		return 0;
 	});
 
-	const char *expectedStringValue;
-	uint64_t stringValueLen;
-	uint64_t paddedStrLen;
+	const char *expectedStringValue = nullptr;
+	uint64_t stringValueLen = 0;
+	uint64_t paddedStrLen = 0;
 
 	SECTION("Uneven string length") {
 		// String is not a multiple of 8 bytes
@@ -411,7 +427,7 @@ TEST_CASE("TestStringRecord", "[write]") {
 		paddedStrLen = 24;
 	}
 
-	uint16_t strIndex;
+	uint16_t strIndex = 0;
 	REQUIRE(fxt::GetOrCreateStringIndex(&writer, expectedStringValue, &strIndex) == 0);
 
 	// The record should be the header (8 bytes) plus the padded string
@@ -1134,8 +1150,6 @@ TEST_CASE("TestArguments", "[write]") {
 	}
 	SECTION("String table name") {
 		const char *argumentName = "myArgumentName";
-		const uint64_t argumentNameLen = 14;
-		const uint64_t argumentNamePaddedLen = 16;
 		// This will be the first string record (index 0 is a special value)
 		const uint16_t expectedNameStrRef = 1;
 		const bool useStrTableForName = true;
