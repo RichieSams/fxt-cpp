@@ -578,7 +578,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 				static const char hexChars[] = "0123456789abcdef";
 
 				size_t encodedLen = arg->value.stringLen * 2;
-				size_t diff = (processedArg->valueSizeInWords - 1) * 8 - encodedLen;
+				size_t diff = processedArg->valueSizeInWords * 8 - encodedLen;
 
 				char buffer[256];
 				static_assert(sizeof(buffer) % 2 == 0, "buffer must be an even size, so we can guarantee we have space for both chars per byte");
