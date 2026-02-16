@@ -145,7 +145,7 @@ using InitializationRecordFields = RecordFields;
 
 struct StringRefFields {
 	static constexpr uint16_t MaxInlineStrLen = 0x7fff;
-	static constexpr uint16_t Inline(int strLen) {
+	static constexpr uint16_t Inline(size_t strLen) {
 		return (uint16_t)0x8000 | (uint16_t)strLen;
 	}
 };

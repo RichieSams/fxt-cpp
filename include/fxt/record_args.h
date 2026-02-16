@@ -34,6 +34,7 @@ struct RecordArgumentValue {
 public:
 	explicit RecordArgumentValue(decltype(nullptr) value)
 	        : type(internal::ArgumentType::Null) {
+		(void)value;
 	}
 	explicit RecordArgumentValue(int32_t value)
 	        : type(internal::ArgumentType::Int32),

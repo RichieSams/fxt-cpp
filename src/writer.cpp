@@ -33,7 +33,7 @@ inline constexpr typename std::underlying_type<T>::type ToUnderlyingType(T value
 // Writer methods
 
 // Stream write helpers
-static int WriteUInt64ToStream(Writer *writer, uint64_t val);
+static int WriteUInt64ToStream(Writer *writer, const uint64_t val);
 static int WriteBytesToStream(Writer *writer, const void *val, size_t len);
 static int WriteZeroPadding(Writer *writer, size_t count);
 
@@ -54,7 +54,7 @@ int AddProviderInfoRecord(Writer *writer, ProviderID providerID, const char *pro
 	}
 
 	// Write the header
-	const uint64_t sizeInWords = 1 + (paddedStrLen / 8);
+	const size_t sizeInWords = 1 + (paddedStrLen / 8);
 	const uint64_t header = ProviderInfoMetadataRecordFields::Type::Make(ToUnderlyingType(RecordType::Metadata)) |
 	                        ProviderInfoMetadataRecordFields::RecordSize::Make(sizeInWords) |
 	                        ProviderInfoMetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::ProviderInfo)) |
@@ -83,7 +83,7 @@ int AddProviderInfoRecord(Writer *writer, ProviderID providerID, const char *pro
 }
 
 int AddProviderSectionRecord(Writer *writer, ProviderID providerID) {
-	const uint64_t sizeInWords = 1;
+	const unsigned sizeInWords = 1;
 	const uint64_t header = ProviderSectionMetadataRecordFields::Type::Make(ToUnderlyingType(RecordType::Metadata)) |
 	                        ProviderSectionMetadataRecordFields::RecordSize::Make(sizeInWords) |
 	                        ProviderSectionMetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::ProviderSection)) |
@@ -97,7 +97,7 @@ int AddProviderSectionRecord(Writer *writer, ProviderID providerID) {
 }
 
 int AddProviderEventRecord(Writer *writer, ProviderID providerID, ProviderEventType eventType) {
-	const uint64_t sizeInWords = 1;
+	const unsigned sizeInWords = 1;
 	const uint64_t header = ProviderEventMetadataRecordFields::Type::Make(ToUnderlyingType(RecordType::Metadata)) |
 	                        ProviderEventMetadataRecordFields::RecordSize::Make(sizeInWords) |
 	                        ProviderEventMetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::ProviderEvent)) |
@@ -112,7 +112,7 @@ int AddProviderEventRecord(Writer *writer, ProviderID providerID, ProviderEventT
 }
 
 int AddInitializationRecord(Writer *writer, uint64_t numTicksPerSecond) {
-	const uint64_t sizeInWords = 2;
+	const unsigned sizeInWords = 2;
 	const uint64_t header = InitializationRecordFields::Type::Make(ToUnderlyingType(RecordType::Initialization)) |
 	                        InitializationRecordFields::RecordSize::Make(sizeInWords);
 	int ret = WriteUInt64ToStream(writer, header);
@@ -137,7 +137,7 @@ static int AddStringRecord(Writer *writer, uint16_t stringIndex, const char *str
 	}
 
 	// Write the header
-	const uint64_t sizeInWords = 1 + (paddedStrLen / 8);
+	const size_t sizeInWords = 1 + (paddedStrLen / 8);
 	const uint64_t header = StringRecordFields::Type::Make(ToUnderlyingType(RecordType::String)) |
 	                        StringRecordFields::RecordSize::Make(sizeInWords) |
 	                        StringRecordFields::StringIndex::Make(stringIndex) |
@@ -208,7 +208,7 @@ int GetOrCreateStringIndex(Writer *writer, const char *str, uint16_t *strIndex) 
 
 static int AddThreadRecord(Writer *writer, uint16_t threadIndex, KernelObjectID processID, KernelObjectID threadID) {
 	// Write the header
-	const uint64_t sizeInWords = 3;
+	const unsigned sizeInWords = 3;
 	const uint64_t header = ThreadRecordFields::Type::Make(ToUnderlyingType(RecordType::Thread)) |
 	                        ThreadRecordFields::RecordSize::Make(sizeInWords) |
 	                        ThreadRecordFields::ThreadIndex::Make(threadIndex);
@@ -287,7 +287,7 @@ int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, Proc
 
 			processedArgs[i].nameStringRef = StringRefFields::Inline(args[i].name.nameLen);
 			const size_t paddedNameStrLen = (args[i].name.nameLen + 8 - 1) & (-8);
-			processedArgs[i].nameSizeInWords = paddedNameStrLen / 8;
+			processedArgs[i].nameSizeInWords = (uint16_t)paddedNameStrLen / 8;
 		}
 
 		// Then we process the value
@@ -321,7 +321,7 @@ int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, Proc
 
 				processedArgs[i].valueStringRef = StringRefFields::Inline(encodedLen);
 				const size_t paddedValueStrLen = (encodedLen + 8 - 1) & (-8);
-				processedArgs[i].valueSizeInWords = paddedValueStrLen / 8;
+				processedArgs[i].valueSizeInWords = (uint16_t)paddedValueStrLen / 8;
 			} else {
 				if (args[i].value.useStringTable) {
 					int ret = GetOrCreateStringIndex(writer, args[i].value.stringValue, args[i].value.stringLen, &processedArgs[i].valueStringRef);
@@ -336,7 +336,7 @@ int ProcessArgs(Writer *writer, const RecordArgument *args, size_t numArgs, Proc
 
 					processedArgs[i].valueStringRef = StringRefFields::Inline(args[i].value.stringLen);
 					const size_t paddedValueStrLen = (args[i].value.stringLen + 8 - 1) & (-8);
-					processedArgs[i].valueSizeInWords = paddedValueStrLen / 8;
+					processedArgs[i].valueSizeInWords = (uint16_t)paddedValueStrLen / 8;
 				}
 			}
 
@@ -371,7 +371,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -400,7 +400,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -429,7 +429,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -457,7 +457,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -490,7 +490,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -523,7 +523,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -557,7 +557,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -581,7 +581,6 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 				char buffer[256];
 				static_assert(sizeof(buffer) % 2 == 0, "buffer must be an even size, so we can guarantee we have space for both chars per byte");
 				size_t offset = 0;
-				size_t writtenBytes = 0;
 
 				// Start encoding in blocks
 				for (size_t i = 0; i < arg->value.stringLen; ++i) {
@@ -615,7 +614,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 					}
 				}
 			} else {
-				unsigned diff = processedArg->valueSizeInWords * 8 - arg->value.stringLen;
+				size_t diff = processedArg->valueSizeInWords * 8 - arg->value.stringLen;
 
 				ret = WriteBytesToStream(writer, arg->value.stringValue, arg->value.stringLen);
 				if (ret != 0) {
@@ -645,7 +644,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -678,7 +677,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -712,7 +711,7 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 
 		// Write the name string if we're using inline strings
 		if (!arg->name.useStringTable) {
-			unsigned diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
+			size_t diff = processedArg->nameSizeInWords * 8 - arg->name.nameLen;
 			ret = WriteBytesToStream(writer, arg->name.name, arg->name.nameLen);
 			if (ret != 0) {
 				return ret;
@@ -743,7 +742,7 @@ int SetProcessName(Writer *writer, KernelObjectID processID, const char *name) {
 	}
 
 	// Write the header
-	const uint64_t sizeInWords = /* header */ 1 + /* processID */ 1;
+	const unsigned sizeInWords = /* header */ 1 + /* processID */ 1;
 	const uint64_t numArgs = 0;
 	const uint64_t header = KernelObjectRecordFields::Type::Make(ToUnderlyingType(RecordType::KernelObject)) |
 	                        KernelObjectRecordFields::RecordSize::Make(sizeInWords) |
@@ -782,7 +781,7 @@ int SetThreadName(Writer *writer, KernelObjectID processID, KernelObjectID threa
 	}
 
 	const unsigned argSizeInWords = /* header */ 1 + processedProcessArg.nameSizeInWords + processedProcessArg.valueSizeInWords;
-	const uint64_t sizeInWords = /* header */ 1 + /* threadID */ 1 + /* argument data */ argSizeInWords;
+	const unsigned sizeInWords = /* header */ 1 + /* threadID */ 1 + /* argument data */ argSizeInWords;
 	if (sizeInWords > KernelObjectRecordFields::kMaxRecordSizeWords) {
 		return FXT_ERR_RECORD_SIZE_TOO_LARGE;
 	}
@@ -851,7 +850,7 @@ static int WriteEventHeaderAndGenericData(Writer *writer, EventType eventType, c
 		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
-	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* argument data */ argumentSizeInWords + /* extra stuff */ extraSizeInWords;
+	const unsigned sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* argument data */ argumentSizeInWords + /* extra stuff */ extraSizeInWords;
 	const uint64_t header = EventRecordFields::Type::Make(ToUnderlyingType(RecordType::Event)) |
 	                        EventRecordFields::RecordSize::Make(sizeInWords) |
 	                        EventRecordFields::EventType::Make(ToUnderlyingType(eventType)) |
@@ -1119,7 +1118,7 @@ int AddBlobRecord(Writer *writer, const char *name, void *data, size_t dataLen, 
 	const size_t diff = paddedSize - dataLen;
 
 	// Write the header
-	const uint64_t sizeInWords = 1 + (paddedSize / 8);
+	const size_t sizeInWords = 1 + (paddedSize / 8);
 	const uint64_t header = BlobRecordFields::Type::Make(ToUnderlyingType(RecordType::Blob)) |
 	                        BlobRecordFields::RecordSize::Make(sizeInWords) |
 	                        BlobRecordFields::NameStringRef::Make(nameIndex) |
@@ -1184,7 +1183,7 @@ int AddUserspaceObjectRecord(Writer *writer, const char *name, KernelObjectID pr
 		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
-	const uint64_t sizeInWords = /* Header */ 1 + /* pointer value */ 1 + /* argument data */ argumentSizeInWords;
+	const unsigned sizeInWords = /* Header */ 1 + /* pointer value */ 1 + /* argument data */ argumentSizeInWords;
 	const uint64_t header = UserspaceObjectRecordFields::Type::Make(ToUnderlyingType(RecordType::UserspaceObject)) |
 	                        UserspaceObjectRecordFields::RecordSize::Make(sizeInWords) |
 	                        UserspaceObjectRecordFields::ThreadRef::Make(threadIndex) |
@@ -1248,7 +1247,7 @@ int AddContextSwitchRecord(Writer *writer, uint16_t cpuNumber, uint8_t outgoingT
 		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
-	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing thread ID */ 1 + /* incoming thread ID */ 1 + /* argument data */ argumentSizeInWords;
+	const unsigned sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing thread ID */ 1 + /* incoming thread ID */ 1 + /* argument data */ argumentSizeInWords;
 	const uint64_t header = ContextSwitchRecordFields::Type::Make(ToUnderlyingType(RecordType::Scheduling)) |
 	                        ContextSwitchRecordFields::RecordSize::Make(sizeInWords) |
 	                        ContextSwitchRecordFields::ArgumentCount::Make(numArgs) |
@@ -1323,7 +1322,7 @@ int AddFiberSwitchRecord(Writer *writer, KernelObjectID processID, KernelObjectI
 		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
-	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing fiber ID */ 1 + /* incoming fiber ID */ 1 + /* argument data */ argumentSizeInWords;
+	const unsigned sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* outgoing fiber ID */ 1 + /* incoming fiber ID */ 1 + /* argument data */ argumentSizeInWords;
 	const uint64_t header = FiberSwitchRecordFields::Type::Make(ToUnderlyingType(RecordType::Scheduling)) |
 	                        FiberSwitchRecordFields::RecordSize::Make(sizeInWords) |
 	                        FiberSwitchRecordFields::ArgumentCount::Make(numArgs) |
@@ -1391,7 +1390,7 @@ int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wak
 		argumentSizeInWords += /* header */ 1 + processedArgs[i].nameSizeInWords + processedArgs[i].valueSizeInWords;
 	}
 
-	const uint64_t sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* waking thread ID */ 1 + /* argument data */ argumentSizeInWords;
+	const unsigned sizeInWords = /* Header */ 1 + /* timestamp */ 1 + /* waking thread ID */ 1 + /* argument data */ argumentSizeInWords;
 	const uint64_t header = ThreadWakeupRecordFields::Type::Make(ToUnderlyingType(RecordType::Scheduling)) |
 	                        ThreadWakeupRecordFields::RecordSize::Make(sizeInWords) |
 	                        ThreadWakeupRecordFields::ArgumentCount::Make(numArgs) |
@@ -1429,7 +1428,7 @@ int AddThreadWakeupRecord(Writer *writer, uint16_t cpuNumber, KernelObjectID wak
 	return 0;
 }
 
-static int WriteUInt64ToStream(Writer *writer, uint64_t val) {
+static int WriteUInt64ToStream(Writer *writer, const uint64_t val) {
 	uint8_t buffer[8];
 
 	buffer[0] = uint8_t(val);

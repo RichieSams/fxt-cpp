@@ -160,7 +160,7 @@ TEST_CASE("TestOverflowingStringTableWraps", "[write]") {
 	uint16_t strIndex;
 	for (int i = 0; i < 512; ++i) {
 		// Generate a unique string for each round. So we get a new index
-		REQUIRE(snprintf(buffer, sizeof(buffer), "str-%d", i) < sizeof(buffer));
+		REQUIRE((size_t)snprintf(buffer, sizeof(buffer), "str-%d", i) < sizeof(buffer));
 		REQUIRE(fxt::GetOrCreateStringIndex(&writer, buffer, &strIndex) == 0);
 		// Zero is a reserved index
 		// We should never get it
@@ -638,7 +638,7 @@ TEST_CASE("TestArguments", "[write]") {
 			// Arg name string ref
 			REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
 			// Value
-			REQUIRE((int32_t)GetFieldFromValue(32, 63, header) == expectedValue);
+			REQUIRE((uint32_t)GetFieldFromValue(32, 63, header) == expectedValue);
 
 			// Check the name string
 			std::string actualStringValue(buffer.begin() + 8, buffer.begin() + (8 + argumentNameLen));
@@ -1283,7 +1283,7 @@ TEST_CASE("TestArguments", "[write]") {
 				// Arg name string ref
 				REQUIRE((uint16_t)GetFieldFromValue(16, 31, header) == expectedNameStrRef);
 				// Check the value
-				REQUIRE((int32_t)GetFieldFromValue(32, 63, header) == expectedValue);
+				REQUIRE((uint32_t)GetFieldFromValue(32, 63, header) == expectedValue);
 			}
 
 			// Check that we read everything
@@ -1758,9 +1758,9 @@ TEST_CASE("TestArguments", "[write]") {
 static uint64_t ValidateStringTableRecord(uint8_t *buffer, const char *expectedValue, uint16_t expectedValueStrRef) {
 	uint64_t bufferOffset = 0;
 
-	uint16_t expectedStrLen = strlen(expectedValue);
-	uint16_t expectedPaddedStrLen = (expectedStrLen + 8 - 1) & (-8);
-	uint16_t expectedStringRecordSizeInWords = 1 /* header */ + (expectedPaddedStrLen / 8);
+	uint64_t expectedStrLen = strlen(expectedValue);
+	uint64_t expectedPaddedStrLen = (expectedStrLen + 8 - 1) & (-8);
+	uint64_t expectedStringRecordSizeInWords = 1 /* header */ + (expectedPaddedStrLen / 8);
 
 	// Validate the header fields
 	uint64_t header = ReadUInt64(&buffer[bufferOffset]);
@@ -1770,7 +1770,7 @@ static uint64_t ValidateStringTableRecord(uint8_t *buffer, const char *expectedV
 	// Record type
 	REQUIRE(GetFieldFromValue(0, 3, header) == (uint64_t)fxt::RecordType::String);
 	// Record size in multiples of uint64_t
-	REQUIRE((uint16_t)GetFieldFromValue(4, 15, header) == expectedStringRecordSizeInWords);
+	REQUIRE(GetFieldFromValue(4, 15, header) == expectedStringRecordSizeInWords);
 	// String index
 	REQUIRE((uint16_t)GetFieldFromValue(16, 30, header) == expectedValueStrRef);
 	// Check padding bit
