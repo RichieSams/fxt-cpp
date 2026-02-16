@@ -18,3 +18,12 @@ target_include_directories(
     ${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/src
 )
+
+# ---- Enable warnings ----
+
+target_compile_options(${PROJECT_NAME} PRIVATE
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+        -Wall -Wextra -Wpedantic -Werror>
+    $<$<CXX_COMPILER_ID:MSVC>:
+        /W4 /WX>
+)
