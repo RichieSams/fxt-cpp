@@ -536,7 +536,9 @@ int WriteArg(Writer *writer, const RecordArgument *arg, ProcessedRecordArgument 
 			}
 		}
 
-		ret = WriteUInt64ToStream(writer, *(uint64_t *)(&arg->value.doubleValue));
+		uint64_t bits;
+		memcpy(&bits, &arg->value.doubleValue, sizeof(bits));
+		ret = WriteUInt64ToStream(writer, bits);
 		if (ret != 0) {
 			return ret;
 		}

@@ -812,7 +812,8 @@ TEST_CASE("TestArguments", "[write]") {
 
 			// Read the value
 			uint64_t rawValue = ReadUInt64(&buffer[argNameEnd]);
-			double value = *reinterpret_cast<double *>(&rawValue);
+			double value;
+			memcpy(&value, &rawValue, sizeof(value));
 			REQUIRE(value == expectedValue);
 		}
 		SECTION("String") {
@@ -1448,7 +1449,8 @@ TEST_CASE("TestArguments", "[write]") {
 				// Read the value
 				uint64_t rawValue = ReadUInt64(&buffer[bufferOffset]);
 				bufferOffset += 8;
-				double value = *reinterpret_cast<double *>(&rawValue);
+				double value;
+				memcpy(&value, &rawValue, sizeof(value));
 				REQUIRE(value == expectedValue);
 			}
 
