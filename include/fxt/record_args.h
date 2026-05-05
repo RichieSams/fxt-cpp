@@ -213,21 +213,21 @@ struct RecordArgument {
 
 // Implementation macros for different pair counts
 #define FXT_INTERNAL_SELECT_0(fn, ...) /* empty */
-#define FXT_INTERNAL_SELECT_1(fn, ...) /* empty */
-#define FXT_INTERNAL_SELECT_2(fn, a, b, ...) fn(a, b)
-#define FXT_INTERNAL_SELECT_3(fn, a, b, ...) fn(a, b)
-#define FXT_INTERNAL_SELECT_4(fn, a, b, c, d, ...) fn(a, b), fn(c, d)
-#define FXT_INTERNAL_SELECT_5(fn, a, b, c, d, ...) fn(a, b), fn(c, d)
-#define FXT_INTERNAL_SELECT_6(fn, a, b, c, d, e, f, ...) fn(a, b), fn(c, d), fn(e, f)
-#define FXT_INTERNAL_SELECT_7(fn, a, b, c, d, e, f, ...) fn(a, b), fn(c, d), fn(e, f)
-#define FXT_INTERNAL_SELECT_8(fn, a, b, c, d, e, f, g, h, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h)
-#define FXT_INTERNAL_SELECT_9(fn, a, b, c, d, e, f, g, h, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h)
-#define FXT_INTERNAL_SELECT_10(fn, a, b, c, d, e, f, g, h, i, j, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j)
-#define FXT_INTERNAL_SELECT_11(fn, a, b, c, d, e, f, g, h, i, j, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j)
-#define FXT_INTERNAL_SELECT_12(fn, a, b, c, d, e, f, g, h, i, j, k, l, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l)
-#define FXT_INTERNAL_SELECT_13(fn, a, b, c, d, e, f, g, h, i, j, k, l, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l)
-#define FXT_INTERNAL_SELECT_14(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n)
-#define FXT_INTERNAL_SELECT_15(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n)
+#define FXT_INTERNAL_SELECT_1(fn, a, b, ...) fn(a, b)
+#define FXT_INTERNAL_SELECT_2(fn, a, b, c, d, ...) fn(a, b), fn(c, d)
+#define FXT_INTERNAL_SELECT_3(fn, a, b, c, d, e, f, ...) fn(a, b), fn(c, d), fn(e, f)
+#define FXT_INTERNAL_SELECT_4(fn, a, b, c, d, e, f, g, h, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h)
+#define FXT_INTERNAL_SELECT_5(fn, a, b, c, d, e, f, g, h, i, j, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j)
+#define FXT_INTERNAL_SELECT_6(fn, a, b, c, d, e, f, g, h, i, j, k, l, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l)
+#define FXT_INTERNAL_SELECT_7(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n)
+#define FXT_INTERNAL_SELECT_8(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p)
+#define FXT_INTERNAL_SELECT_9(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p), fn(q, r)
+#define FXT_INTERNAL_SELECT_10(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p), fn(q, r), fn(s, t)
+#define FXT_INTERNAL_SELECT_11(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p), fn(q, r), fn(s, t), fn(u, v)
+#define FXT_INTERNAL_SELECT_12(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p), fn(q, r), fn(s, t), fn(u, v), fn(w, x)
+#define FXT_INTERNAL_SELECT_13(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p), fn(q, r), fn(s, t), fn(u, v), fn(w, x), fn(y, z)
+#define FXT_INTERNAL_SELECT_14(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, ab, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p), fn(q, r), fn(s, t), fn(u, v), fn(w, x), fn(y, z), fn(aa, ab)
+#define FXT_INTERNAL_SELECT_15(fn, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, ab, ac, ad, ...) fn(a, b), fn(c, d), fn(e, f), fn(g, h), fn(i, j), fn(k, l), fn(m, n), fn(o, p), fn(q, r), fn(s, t), fn(u, v), fn(w, x), fn(y, z), fn(aa, ab), fn(ac, ad)
 
 // Helper macros for indirection and selection
 #define FXT_INTERNAL_SELECT_HELPER(N) FXT_INTERNAL_SELECT_##N
@@ -237,7 +237,7 @@ struct RecordArgument {
  * Applies the given fn to each pair of arguments
  */
 #define FXT_INTERNAL_APPLY_PAIRWISE_CSV(fn, ...) \
-	FXT_INTERNAL_EXPAND3(FXT_INTERNAL_SELECT(FXT_INTERNAL_EXPAND(FXT_INTERNAL_COUNT_PAIRS(__VA_ARGS__)))(fn, __VA_ARGS__))
+	FXT_INTERNAL_EXPAND3(FXT_INTERNAL_SELECT(FXT_INTERNAL_EXPAND(FXT_INTERNAL_COUNT_PAIRS(__VA_ARGS__)))(fn, __VA_ARGS__, nullptr))
 
 #define FXT_INTERNAL_DECLARE_ARG(name, value) \
 	fxt::RecordArgument(name, fxt::RecordArgumentValue(value))

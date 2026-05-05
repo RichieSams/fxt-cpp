@@ -2,6 +2,7 @@
 
 set(SRC_FILES
 	${PROJECT_SOURCE_DIR}/tests/src/main.cpp
+	${PROJECT_SOURCE_DIR}/tests/src/record_args.cpp
 	${PROJECT_SOURCE_DIR}/tests/src/write.cpp
 	${PROJECT_SOURCE_DIR}/tests/src/writer_test.h
 	${PROJECT_SOURCE_DIR}/tests/src/writer_validation.h
